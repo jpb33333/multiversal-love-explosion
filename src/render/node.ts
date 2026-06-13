@@ -52,12 +52,24 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: MvNode, time: numb
     case 'potential': {
       const tw = 0.65 + 0.35 * Math.sin(time * 2 + node.id);
       const core = blendHex(palette.entropy, palette.loveBright, node.love);
-      glow(ctx, node.x, node.y, 5.5, tint, core, 0.45, 1.9, 0.7 * tw);
+      glow(ctx, node.x, node.y, 6, tint, core, 0.5, 2.0, 0.82 * tw);
       break;
     }
     case 'loving': {
       const tw = 0.85 + 0.15 * Math.sin(time * 3 + node.id);
-      glow(ctx, node.x, node.y, 8, palette.love, palette.loveBright, 0.85, 2.9, tw);
+      glow(ctx, node.x, node.y, 8.5, palette.love, palette.loveBright, 0.9, 3.0, tw);
+      // Readiness halo — brightens and tightens as the node nears lock-in.
+      const ready = clamp(node.lovingTimer / LOCK.STABILITY_SECONDS, 0, 1);
+      if (ready > 0.35) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = rgba(palette.loveBright, 0.1 + 0.5 * ready * ready);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 11 + 3 * Math.sin(time * 4 + node.id), 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
       break;
     }
     case 'unloving': {

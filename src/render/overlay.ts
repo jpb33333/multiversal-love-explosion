@@ -247,7 +247,7 @@ export function drawPlayingHelp(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.fillStyle = rgba(palette.mist, 0.4);
   ctx.font = `400 ${cpx(12)}px ${fonts.sans}`;
   ctx.fillText(
-    'P1 hold to love  ·  P2 arrows + space  ·  bond = both hold nearby at once',
+    'P1 hold to love  ·  P2 arrows + space  ·  bond = both hold nearby  ·  M mutes',
     w / 2,
     h - 16,
   );
