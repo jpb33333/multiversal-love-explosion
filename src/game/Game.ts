@@ -6,6 +6,7 @@
 // given seed + input is deterministic.
 
 import { Renderer, type RenderInput } from '../render/Renderer.ts';
+import { AudioEngine } from '../render/audio.ts';
 import { Multiverse } from '../sim/Multiverse.ts';
 import { SIM } from '../sim/constants.ts';
 import { LoveOutcomeClassifier } from './outcomes.ts';
@@ -38,6 +39,10 @@ export class Game {
   private lastFrame = 0;
   private elapsed = 0; // wall seconds since boot
   private simAccum = 0;
+  private readonly audio = new AudioEngine();
+  private nurtureSfxT = 0; // throttles the nurture tick/spark
+  private winCascadeT = 0; // remaining seconds of the win cascade
+  private winCascadeAcc = 0; // spacing between cascade bursts
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -61,6 +66,7 @@ export class Game {
       'pointerdown',
       e => {
         e.preventDefault();
+        this.audio.resume(); // first user gesture unlocks Web Audio
         const p = this.renderer.screenToLogical(e);
         this.pointer.setPos(p);
         const consumedByButton = this.onClick(p);
@@ -101,6 +107,11 @@ export class Game {
   }
 
   private onKeyDown(e: KeyboardEvent): void {
+    this.audio.resume(); // first user gesture unlocks Web Audio
+    if (e.code === 'KeyM') {
+      this.audio.toggleMute();
+      return;
+    }
     if (e.code === 'Escape') {
       if (this.state !== 'title') this.toTitle();
       return;
@@ -164,14 +175,18 @@ export class Game {
     });
     this.stats = summarize();
     if (win) {
-      // A cascade from the centre of the screen, where the cluster sits.
+      this.audio.win();
+      this.winCascadeT = 1.8;
+      this.winCascadeAcc = 0;
       this.renderer.burst(
         this.renderer.layout.width / 2,
         this.renderer.layout.height / 2,
-        140,
+        120,
         palette.loveBright,
         340,
       );
+    } else {
+      this.audio.lose();
     }
   }
 
@@ -204,12 +219,52 @@ export class Game {
 
       if (c) this.centroidTrail.push(c.x, c.y);
       this.drainLockEvents();
+      this.audio.setLove(this.mv.tally().loveShare);
 
       if (this.state === 'playing') {
+        this.nurtureFeedback(dt);
         const outcome = this.classifier.update(this.mv, dt);
         if (outcome.kind !== 'playing') this.resolve(outcome.kind);
+      } else if (this.state === 'won') {
+        this.winCascade(dt);
       }
+    } else {
+      this.audio.setLove(0);
     }
+  }
+
+  // A throttled tick + spark at the universe a player is actively loving.
+  private nurtureFeedback(dt: number): void {
+    if (!this.mv) return;
+    this.nurtureSfxT -= dt;
+    if (this.nurtureSfxT > 0) return;
+    const id =
+      this.pointer.held && this.p1Target !== null
+        ? this.p1Target
+        : this.keyCursor.nurturing && this.keyCursor.selectedId !== null
+          ? this.keyCursor.selectedId
+          : null;
+    if (id === null) return;
+    const node = this.mv.graph.get(id);
+    if (!node) return;
+    this.audio.nurture(node.love);
+    const off = this.cameraOffset ?? { x: 0, y: 0 };
+    this.renderer.burst(node.x + off.x, node.y + off.y, 2, palette.love, 70);
+    this.nurtureSfxT = 0.13;
+  }
+
+  // Staggered bursts rippling out from the centre after a Love Explosion.
+  private winCascade(dt: number): void {
+    if (this.winCascadeT <= 0) return;
+    this.winCascadeT -= dt;
+    this.winCascadeAcc -= dt;
+    if (this.winCascadeAcc > 0) return;
+    const w = this.renderer.layout.width;
+    const h = this.renderer.layout.height;
+    const x = w * 0.5 + (Math.random() - 0.5) * w * 0.72;
+    const y = h * 0.5 + (Math.random() - 0.5) * h * 0.6;
+    this.renderer.burst(x, y, 24, Math.random() < 0.5 ? palette.love : palette.loveBright, 300);
+    this.winCascadeAcc = 0.08;
   }
 
   private advanceSim(dt: number): void {
@@ -231,7 +286,18 @@ export class Game {
     if (this.pointer.held && p1 !== null) this.mv.nurture(p1);
     if (this.keyCursor.nurturing && p2 !== null) this.mv.nurture(p2);
     const bothHolding = this.pointer.held && this.keyCursor.nurturing;
-    this.bond.update(this.mv, SIM.DT, bothHolding, p1, p2);
+    const bondResult = this.bond.update(this.mv, SIM.DT, bothHolding, p1, p2);
+    if (bondResult === 'fired') {
+      this.audio.bond();
+      const off = this.cameraOffset ?? { x: 0, y: 0 };
+      this.renderer.burst(
+        this.bond.lastFireX + off.x,
+        this.bond.lastFireY + off.y,
+        Math.min(20 + this.bond.lastFireSize * 4, 80),
+        palette.loveBright,
+        280,
+      );
+    }
   }
 
   // The node under the P1 pointer (in world space), or null if the pointer is
@@ -251,6 +317,7 @@ export class Game {
     if (!this.mv) return;
     const off = this.cameraOffset ?? { x: 0, y: 0 };
     for (const ev of this.mv.lockEvents) {
+      this.audio.lock(ev.size);
       this.renderer.burst(
         ev.x + off.x,
         ev.y + off.y,

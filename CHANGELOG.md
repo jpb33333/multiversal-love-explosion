@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-06-13
+
+### Added
+
+- Sound: a zero-dependency Web Audio engine — a soft pad that warms as love
+  grows, plus nurture ticks, lock-in chimes, the co-op bond chord, a rising win
+  swell, and an entropy-collapse sigh. Mute with **M**.
+- Juice: love-spark bursts when you pour love, a staggered Love-Explosion
+  cascade on a win, flowing light along loving edges, and a readiness halo on
+  universes about to lock in.
+
 ## [0.1.0] — 2026-06-13
 
 ### Added

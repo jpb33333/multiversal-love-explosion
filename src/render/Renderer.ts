@@ -291,7 +291,7 @@ export class Renderer {
         if (nid <= node.id) continue; // draw each undirected edge once
         const nb = mv.graph.get(nid);
         if (!nb) continue;
-        drawEdge(ctx, node.x, node.y, nb.x, nb.y, (node.love + nb.love) / 2);
+        drawEdge(ctx, node.x, node.y, nb.x, nb.y, (node.love + nb.love) / 2, input.time);
       }
     }
     ctx.restore();
