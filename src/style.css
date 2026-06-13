@@ -1,0 +1,59 @@
+/* No @font-face: the theme font stacks fall back to Georgia / system-ui, so we
+   ship no font files and make no extra requests. Swap in self-hosted woff2 here
+   later if a specific face is wanted (mirror BW's approach). */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #0b0a18; /* palette.voidDeep — kept in sync with src/theme.ts by hand */
+  color: #f3e9de; /* palette.pearl */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  /* iOS Safari: the dynamic-viewport unit tracks what's actually visible, so
+     the canvas never sits half-hidden behind the collapsing toolbar. */
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The canvas fills the whole viewport. The game renders into a fixed design
+   space (1280×800 landscape / 800×1280 portrait) which the Renderer maps with
+   a uniform contain-fit (centered, letterboxed, DPR-sharp); the world scrolls
+   under a camera that follows the live cluster. JS sets exact px on resize;
+   100vw/100vh is the pre-script fallback. */
+#stage {
+  display: block;
+  background: #0b0a18;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  cursor: default;
+  /* On touch devices: claim every gesture as game input — disable browser
+     pinch-zoom, double-tap-zoom, and pull-to-refresh on the canvas. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Shown only when JavaScript is disabled — a canvas app cannot degrade
+   further. Styled via this class (not inline) so the strict CSP needs no
+   'unsafe-inline'. */
+.noscript-notice {
+  margin: 0;
+  padding: 2em;
+  font: 18px/1.5 'Cardo', Georgia, serif;
+  color: #f3e9de;
+  background: #0b0a18;
+}
