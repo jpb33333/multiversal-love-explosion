@@ -62,9 +62,9 @@ export function drawWordmark(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.fillStyle = palette.love;
   ctx.font = `400 ${cpx(64)}px ${fonts.serif}`;
   ctx.fillText('Love Explosion', w / 2, h * 0.28 + cpx(66));
-  ctx.fillStyle = rgba(palette.mist, 0.75);
+  ctx.fillStyle = rgba(palette.mist, 0.78);
   ctx.font = `italic 400 ${cpx(18)}px ${fonts.serif}`;
-  ctx.fillText('help love outshine entropy — together', w / 2, h * 0.28 + cpx(66) + cpx(40));
+  ctx.fillText('for 1 or 2 players  ·  help love outshine entropy', w / 2, h * 0.28 + cpx(66) + cpx(40));
   ctx.restore();
 }
 
@@ -219,14 +219,13 @@ export function drawHowtoCard(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.fillText('How to play', w / 2, y + cpx(46));
 
   const lines = [
-    'Player 1 — mouse / touch: hover a universe and HOLD to pour in love.',
-    'Player 2 — keyboard: arrows / WASD to move, SPACE to pour in love.',
-    'Grow a cluster of loving universes and it locks in — banking love',
-    'and easing the pressure, then fading into the background sky.',
-    'THE BOND: both of you hold love on two nearby universes at once to',
-    'flood and lock a whole region. Late game, you can only win together.',
-    'Tip the balance to LOVE and the multiverse explodes with joy. Let',
-    'ENTROPY take over and it collapses. It speeds up — keep up, together.',
+    'YOU (mouse): move over a universe and HOLD the button to fill it with love.',
+    'Love spreads to connected universes. Grow a glowing cluster and it LOCKS IN —',
+    'banking love and easing the pressure. Win when the LOVE meter passes the mark.',
+    'PLAYER 2 (optional, keyboard): arrow keys / WASD move a second cursor, SPACE loves.',
+    'THE BOND: P1 holds + P2 loves two connected universes at once to flood and lock',
+    'a whole region instantly — the late-game power move.',
+    'Playable solo, unstoppable as two. It speeds up — keep love ahead of entropy.',
   ];
   ctx.fillStyle = rgba(palette.pearl, 0.82);
   ctx.font = `400 ${cpx(15)}px ${fonts.sans}`;
@@ -247,9 +246,30 @@ export function drawPlayingHelp(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.fillStyle = rgba(palette.mist, 0.4);
   ctx.font = `400 ${cpx(12)}px ${fonts.sans}`;
   ctx.fillText(
-    'P1 hold to love  ·  P2 arrows + space  ·  bond = both hold nearby  ·  M mutes',
+    'Mouse: hold a universe to love it   ·   Player 2 (optional): arrows + space   ·   M mutes',
     w / 2,
     h - 16,
   );
+  ctx.restore();
+}
+
+// A pill banner just under the meter carrying the current onboarding hint.
+export function drawCoachBanner(ctx: CanvasRenderingContext2D, w: number, text: string): void {
+  ctx.save();
+  ctx.font = `600 ${cpx(17)}px ${fonts.sans}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const bw = ctx.measureText(text).width + 36;
+  const bh = cpx(17) + 18;
+  const x = (w - bw) / 2;
+  const y = 80;
+  roundRectPath(ctx, x, y, bw, bh, bh / 2);
+  ctx.fillStyle = rgba(palette.voidDeep, 0.72);
+  ctx.fill();
+  ctx.strokeStyle = rgba(palette.love, 0.5);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = palette.pearl;
+  ctx.fillText(text, w / 2, y + bh / 2);
   ctx.restore();
 }
