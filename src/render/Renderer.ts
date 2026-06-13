@@ -32,7 +32,8 @@ import type { StatsSummary } from '../game/stats.ts';
 // never mutates the simulation (the pure/view boundary).
 export interface RenderInput {
   state: GameStateKind;
-  time: number;
+  time: number; // wall-clock seconds since boot — for starfield/cursor animation
+  simTime: number; // multiverse sim time — for lock-in fade (0 when no sim)
   dt: number;
   hover: { x: number; y: number } | null;
   mv: Multiverse | null;
@@ -295,7 +296,7 @@ export class Renderer {
     }
     ctx.restore();
 
-    for (const node of mv.graph.values()) drawNode(ctx, node, input.time);
+    for (const node of mv.graph.values()) drawNode(ctx, node, input.simTime);
 
     const pTarget = input.pointer.targetId !== null ? mv.graph.get(input.pointer.targetId) : undefined;
     if (pTarget) drawTargetRing(ctx, pTarget.x, pTarget.y, palette.player1);
