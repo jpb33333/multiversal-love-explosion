@@ -28,9 +28,9 @@ export interface OutcomeConfig {
 
 export const DEFAULT_OUTCOME_CONFIG: OutcomeConfig = {
   warmupSeconds: SIM.WARMUP_SECONDS,
-  winLoveShare: 0.72,
+  winLoveShare: 0.7,
   winDwellSeconds: 3.0,
-  winMinBanked: 18,
+  winMinBanked: 12,
   loseEntropyShare: 0.8,
   loseDwellSeconds: 4.0,
   loseWipeoutSeconds: 2.0,

@@ -43,6 +43,11 @@ export class Game {
   private nurtureSfxT = 0; // throttles the nurture tick/spark
   private winCascadeT = 0; // remaining seconds of the win cascade
   private winCascadeAcc = 0; // spacing between cascade bursts
+  private coaching = false; // show onboarding hints (only until the first win)
+  private coachStep = 0; // 0 love-a-node · 1 grow · 2 done/fading
+  private coachFadeT = 0;
+  private hasPouredLove = false;
+  private firstLockSeen = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -159,6 +164,11 @@ export class Game {
     this.p1Target = null;
     this.simAccum = 0;
     this.pointer.release();
+    this.coaching = this.stats.wins === 0; // teach newcomers, leave veterans alone
+    this.coachStep = 0;
+    this.coachFadeT = 0;
+    this.hasPouredLove = false;
+    this.firstLockSeen = false;
     this.state = 'playing';
   }
 
@@ -207,10 +217,16 @@ export class Game {
     if ((this.state === 'playing' || this.state === 'won') && this.mv) {
       const c = this.mv.centroid();
       if (c) {
-        this.cameraOffset = {
-          x: this.renderer.layout.width / 2 - c.x,
-          y: this.renderer.layout.height / 2 - c.y,
-        };
+        const tx = this.renderer.layout.width / 2 - c.x;
+        const ty = this.renderer.layout.height / 2 - c.y;
+        if (this.cameraOffset === null) {
+          this.cameraOffset = { x: tx, y: ty };
+        } else {
+          // Ease toward the target (~0.4s) so the view glides, never lurches.
+          const k = 1 - Math.exp(-dt / 0.4);
+          this.cameraOffset.x += (tx - this.cameraOffset.x) * k;
+          this.cameraOffset.y += (ty - this.cameraOffset.y) * k;
+        }
       }
       this.p1Target = this.computeP1Target();
       if (this.state === 'playing') this.keyCursor.step(this.mv, dt);
@@ -223,6 +239,7 @@ export class Game {
 
       if (this.state === 'playing') {
         this.nurtureFeedback(dt);
+        this.updateCoach(dt);
         const outcome = this.classifier.update(this.mv, dt);
         if (outcome.kind !== 'playing') this.resolve(outcome.kind);
       } else if (this.state === 'won') {
@@ -267,6 +284,45 @@ export class Game {
     this.winCascadeAcc = 0.08;
   }
 
+  // Onboarding progress: advance from "love a node" → "grow it" → fade out, all
+  // driven by what the player has actually done.
+  private updateCoach(dt: number): void {
+    if (!this.coaching) return;
+    if (!this.hasPouredLove) {
+      this.coachStep = 0;
+    } else if (!this.firstLockSeen) {
+      this.coachStep = 1;
+    } else {
+      if (this.coachStep < 2) {
+        this.coachStep = 2;
+        this.coachFadeT = 4;
+      }
+      this.coachFadeT -= dt;
+    }
+  }
+
+  // The current coach hint + the universe to spotlight (null when none).
+  private coachInfo(): { text: string; targetId: number | null } | null {
+    if (!this.coaching || !this.mv) return null;
+    if (this.coachStep === 0) {
+      const c = this.mv.centroid();
+      return {
+        text: 'Move your mouse over a universe and HOLD to fill it with love',
+        targetId: c ? this.mv.nearestNode(c, 1e9) : null,
+      };
+    }
+    if (this.coachStep === 1) {
+      return { text: 'Now love its neighbours — grow a glowing cluster', targetId: null };
+    }
+    if (this.coachStep === 2 && this.coachFadeT > 0) {
+      return {
+        text: 'Locked in! Keep love spreading — win when LOVE passes the ↑ mark',
+        targetId: null,
+      };
+    }
+    return null;
+  }
+
   private advanceSim(dt: number): void {
     if (!this.mv) return;
     this.simAccum += dt;
@@ -283,8 +339,14 @@ export class Game {
     if (!this.mv) return;
     const p1 = this.p1Target;
     const p2 = this.keyCursor.selectedId;
-    if (this.pointer.held && p1 !== null) this.mv.nurture(p1);
-    if (this.keyCursor.nurturing && p2 !== null) this.mv.nurture(p2);
+    if (this.pointer.held && p1 !== null) {
+      this.mv.nurture(p1);
+      this.hasPouredLove = true;
+    }
+    if (this.keyCursor.nurturing && p2 !== null) {
+      this.mv.nurture(p2);
+      this.hasPouredLove = true;
+    }
     const bothHolding = this.pointer.held && this.keyCursor.nurturing;
     const bondResult = this.bond.update(this.mv, SIM.DT, bothHolding, p1, p2);
     if (bondResult === 'fired') {
@@ -315,6 +377,7 @@ export class Game {
   // Turn each lock-in into a love-spark burst at its on-screen position.
   private drainLockEvents(): void {
     if (!this.mv) return;
+    if (this.mv.lockEvents.length > 0) this.firstLockSeen = true;
     const off = this.cameraOffset ?? { x: 0, y: 0 };
     for (const ev of this.mv.lockEvents) {
       this.audio.lock(ev.size);
@@ -345,6 +408,8 @@ export class Game {
       keyCursor: { selectedId: this.keyCursor.selectedId },
       bondCharge: this.bond.chargeProgress,
       bothHolding: this.pointer.held && this.keyCursor.nurturing,
+      p2Active: this.keyCursor.active,
+      coach: this.coachInfo(),
       peakLoveShare: this.classifier.peakLoveShare,
       stats: this.stats,
     };

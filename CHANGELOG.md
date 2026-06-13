@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-06-13
+
+### Changed
+
+- Onboarding: first-time players get coach hints that teach the loop (a
+  highlighted universe → "hold to love it" → "grow it" → fade), shown until the
+  first win.
+- Control clarity: the Player 2 keyboard cursor stays hidden until a second
+  player actually presses a key (no more confusing idle ring); a love-beam links
+  the mouse to the universe being filled; the P2 ring is labeled.
+- Calmer camera: the view eases toward the cluster instead of lurching.
+- Winnable solo: tighter, denser, clearer network; punchier nurture; gentler
+  early entropy; easier lock-ins and a lower win bar.
+- Clearer messaging: title says "1 or 2 players"; how-to and in-game hints
+  rewritten for mouse + keyboard, solo-friendly.
+
 ## [0.2.0] — 2026-06-13
 
 ### Added

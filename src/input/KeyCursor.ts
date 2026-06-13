@@ -23,16 +23,19 @@ export class KeyCursor {
   private held = new Set<string>();
   private nurtureHeld = false;
   private hopCd = 0;
+  private everPressed = false; // P2 only "exists" once they press a key
 
   // Returns true if the key is one we handle (so the Game can preventDefault and
   // stop the page from scrolling on arrows/space).
   onKeyDown(code: string): boolean {
     if (code in MOVE_KEYS) {
       this.held.add(code);
+      this.everPressed = true;
       return true;
     }
     if (NURTURE_KEYS.has(code)) {
       this.nurtureHeld = true;
+      this.everPressed = true;
       return true;
     }
     return false;
@@ -47,8 +50,14 @@ export class KeyCursor {
     return this.nurtureHeld;
   }
 
+  // True once Player 2 has touched the keyboard — gates their cursor + the bond.
+  get active(): boolean {
+    return this.everPressed;
+  }
+
   // Resolve hop intent on an interval, and keep a valid selection.
   step(mv: Multiverse, dt: number): void {
+    if (!this.everPressed) return; // P2 hasn't joined — no cursor, no auto-grab
     if (this.selectedId !== null && !mv.graph.has(this.selectedId)) this.selectedId = null;
 
     if (this.hopCd > 0) this.hopCd -= dt;
@@ -77,5 +86,6 @@ export class KeyCursor {
     this.nurtureHeld = false;
     this.hopCd = 0;
     this.selectedId = null;
+    this.everPressed = false;
   }
 }

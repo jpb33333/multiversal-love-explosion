@@ -12,7 +12,15 @@ import {
 } from './starfield.ts';
 import { drawNode } from './node.ts';
 import { drawEdge } from './edge.ts';
-import { drawPointerCursor, drawSelectionRing, drawTargetRing, drawBondBeam } from './cursors.ts';
+import {
+  drawPointerCursor,
+  drawSelectionRing,
+  drawTargetRing,
+  drawBondBeam,
+  drawLoveBeam,
+  drawCoachHighlight,
+  drawCursorLabel,
+} from './cursors.ts';
 import {
   type CanvasButton,
   drawButton,
@@ -23,6 +31,7 @@ import {
   drawTitleStats,
   drawHowtoCard,
   drawPlayingHelp,
+  drawCoachBanner,
 } from './overlay.ts';
 import type { Multiverse, Tally } from '../sim/Multiverse.ts';
 import { DEFAULT_OUTCOME_CONFIG } from '../game/outcomes.ts';
@@ -44,6 +53,8 @@ export interface RenderInput {
   keyCursor: { selectedId: number | null };
   bondCharge: number; // 0..1 — drives the bond-beam intensity
   bothHolding: boolean; // both players pouring (show the bond beam)
+  p2Active: boolean; // P2 has joined — only then is their cursor shown
+  coach: { text: string; targetId: number | null } | null; // onboarding hint
   peakLoveShare: number;
   stats: StatsSummary;
 }
@@ -232,6 +243,7 @@ export class Renderer {
       drawMeter(this.ctx, this.layout.width, input.tally.loveShare, DEFAULT_OUTCOME_CONFIG.winLoveShare);
     }
     if (input.mv) drawScore(this.ctx, this.layout.width, input.mv.score);
+    if (input.coach) drawCoachBanner(this.ctx, this.layout.width, input.coach.text);
     drawPlayingHelp(this.ctx, this.layout.width, this.layout.height);
   }
 
@@ -298,10 +310,23 @@ export class Renderer {
 
     for (const node of mv.graph.values()) drawNode(ctx, node, input.simTime);
 
+    // Onboarding spotlight on the universe the coach is pointing at.
+    if (input.coach && input.coach.targetId !== null) {
+      const cn = mv.graph.get(input.coach.targetId);
+      if (cn) drawCoachHighlight(ctx, cn.x, cn.y, input.time);
+    }
+
     const pTarget = input.pointer.targetId !== null ? mv.graph.get(input.pointer.targetId) : undefined;
     if (pTarget) drawTargetRing(ctx, pTarget.x, pTarget.y, palette.player1);
-    const kSel = input.keyCursor.selectedId !== null ? mv.graph.get(input.keyCursor.selectedId) : undefined;
-    if (kSel) drawSelectionRing(ctx, kSel.x, kSel.y, input.time);
+    // P2's ring only appears once a second player has actually pressed a key.
+    const kSel =
+      input.p2Active && input.keyCursor.selectedId !== null
+        ? mv.graph.get(input.keyCursor.selectedId)
+        : undefined;
+    if (kSel) {
+      drawSelectionRing(ctx, kSel.x, kSel.y, input.time);
+      drawCursorLabel(ctx, kSel.x, kSel.y + 4, 'P2', palette.player2);
+    }
 
     if (input.bothHolding && pTarget && kSel && pTarget.id !== kSel.id) {
       drawBondBeam(ctx, pTarget.x, pTarget.y, kSel.x, kSel.y, input.bondCharge);
@@ -309,6 +334,18 @@ export class Renderer {
 
     ctx.restore();
 
+    // Love beam from the cursor to its target (drawn in design space so it
+    // starts exactly at the mouse).
+    if (input.pointer.pos && input.pointer.held && pTarget && input.cameraOffset) {
+      drawLoveBeam(
+        ctx,
+        input.pointer.pos.x,
+        input.pointer.pos.y,
+        pTarget.x + input.cameraOffset.x,
+        pTarget.y + input.cameraOffset.y,
+        input.time,
+      );
+    }
     if (input.pointer.pos) {
       drawPointerCursor(ctx, input.pointer.pos.x, input.pointer.pos.y, input.pointer.held, input.time);
     }
