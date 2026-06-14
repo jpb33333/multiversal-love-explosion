@@ -49,8 +49,7 @@ export class Game {
   private hasPouredLove = false;
   private firstLockSeen = false;
   private hasConnected = false;
-  private dragFromId: number | null = null; // universe a drag started from
-  private connecting = false; // currently dragging a new link
+  private dragFromId: number | null = null; // current node of the P1 love-stroke
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -177,7 +176,6 @@ export class Game {
     this.firstLockSeen = false;
     this.hasConnected = false;
     this.dragFromId = null;
-    this.connecting = false;
     this.state = 'playing';
   }
 
@@ -238,11 +236,6 @@ export class Game {
         }
       }
       this.p1Target = this.computeP1Target();
-      this.connecting =
-        this.pointer.held &&
-        this.dragFromId !== null &&
-        this.p1Target !== null &&
-        this.p1Target !== this.dragFromId;
       if (this.state === 'playing') {
         this.keyCursor.step(this.mv, dt);
         const link = this.keyCursor.consumeLink(); // P2 finished a keyboard connect
@@ -333,13 +326,10 @@ export class Game {
       };
     }
     if (this.coachStep === 1) {
-      return { text: 'Now DRAG from that universe to a nearby one to connect them', targetId: null };
+      return { text: 'Keep holding and SWEEP to a neighbour — they link as you go', targetId: null };
     }
     if (this.coachStep === 2) {
-      return {
-        text: 'Love flows along your links — connect more to grow a glowing web',
-        targetId: null,
-      };
+      return { text: 'Sweep across universes to grow a glowing web of love', targetId: null };
     }
     if (this.coachStep === 3 && this.coachFadeT > 0) {
       return { text: 'A cluster locked in! Win when LOVE passes the ↑ mark', targetId: null };
@@ -363,9 +353,17 @@ export class Game {
     if (!this.mv) return;
     const p1 = this.p1Target;
     const p2 = this.keyCursor.selectedId;
-    if (this.pointer.held && p1 !== null && p1 === this.dragFromId) {
-      this.mv.nurture(p1); // pour love only while holding the universe you grabbed
+    // P1 love-stroke: love the universe under the cursor and chain it to the
+    // previous one as you sweep — connecting is one fluid motion, no aiming.
+    if (this.pointer.held && p1 !== null) {
+      this.mv.nurture(p1);
       this.hasPouredLove = true;
+      if (this.dragFromId === null) {
+        this.dragFromId = p1;
+      } else if (p1 !== this.dragFromId) {
+        if (this.mv.connect(this.dragFromId, p1)) this.hasConnected = true;
+        this.dragFromId = p1;
+      }
     }
     if (this.keyCursor.nurturing && p2 !== null) {
       this.mv.nurture(p2);
@@ -435,14 +433,7 @@ export class Game {
 
   // On release: if the drag ended on a different nearby universe, wire them.
   private onPointerUp(): void {
-    if (this.mv && this.state === 'playing' && this.dragFromId !== null) {
-      const drop = this.computeP1Target();
-      if (drop !== null && drop !== this.dragFromId && this.mv.connect(this.dragFromId, drop)) {
-        this.hasConnected = true;
-      }
-    }
-    this.dragFromId = null;
-    this.connecting = false;
+    this.dragFromId = null; // end the love-stroke
     this.pointer.release();
   }
 
@@ -459,13 +450,11 @@ export class Game {
       cameraOffset: this.cameraOffset,
       centroidTrail: this.centroidTrail,
       pointer: { pos: this.pointer.pos, targetId: this.p1Target, held: this.pointer.held },
-      keyCursor: { selectedId: this.keyCursor.selectedId, linkFromId: this.keyCursor.linkFromId },
+      keyCursor: { selectedId: this.keyCursor.selectedId },
       bondCharge: this.bond.chargeProgress,
       bothHolding: this.pointer.held && this.keyCursor.nurturing,
       p2Active: this.keyCursor.active,
       coach: this.coachInfo(),
-      connecting: this.connecting,
-      dragFromId: this.dragFromId,
       peakLoveShare: this.classifier.peakLoveShare,
       stats: this.stats,
     };

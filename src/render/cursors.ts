@@ -128,35 +128,6 @@ export function drawCoachHighlight(
   ctx.restore();
 }
 
-// The bright dashed link being drawn while the player drags from one universe
-// toward another to connect them.
-export function drawConnectDrag(
-  ctx: CanvasRenderingContext2D,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-  time: number,
-): void {
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = rgba(palette.loveBright, 0.85);
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  ctx.setLineDash([6, 8]);
-  ctx.lineDashOffset = -time * 60;
-  ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(bx, by);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = rgba(palette.loveBright, 0.9);
-  ctx.beginPath();
-  ctx.arc(ax, ay, 4, 0, TAU);
-  ctx.fill();
-  ctx.restore();
-}
-
 // A small label under a cursor (used for the P2 ring so a second player knows
 // which one is theirs).
 export function drawCursorLabel(

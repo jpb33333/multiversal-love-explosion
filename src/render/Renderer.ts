@@ -18,7 +18,6 @@ import {
   drawTargetRing,
   drawBondBeam,
   drawLoveBeam,
-  drawConnectDrag,
   drawCoachHighlight,
   drawCursorLabel,
 } from './cursors.ts';
@@ -51,13 +50,11 @@ export interface RenderInput {
   cameraOffset: { x: number; y: number } | null; // world → design-center translation
   centroidTrail: Trail;
   pointer: { pos: { x: number; y: number } | null; targetId: number | null; held: boolean };
-  keyCursor: { selectedId: number | null; linkFromId: number | null };
+  keyCursor: { selectedId: number | null };
   bondCharge: number; // 0..1 — drives the bond-beam intensity
   bothHolding: boolean; // both players pouring (show the bond beam)
   p2Active: boolean; // P2 has joined — only then is their cursor shown
   coach: { text: string; targetId: number | null } | null; // onboarding hint
-  connecting: boolean; // the player is dragging a new link
-  dragFromId: number | null; // the universe a drag started from
   peakLoveShare: number;
   stats: StatsSummary;
 }
@@ -330,13 +327,6 @@ export class Renderer {
       drawSelectionRing(ctx, kSel.x, kSel.y, input.time);
       drawCursorLabel(ctx, kSel.x, kSel.y + 4, 'P2', palette.player2);
     }
-    // P2's in-progress keyboard link: from the grabbed source to their cursor.
-    if (input.p2Active && input.keyCursor.linkFromId !== null) {
-      const lf = mv.graph.get(input.keyCursor.linkFromId);
-      if (lf) {
-        drawConnectDrag(ctx, lf.x, lf.y, kSel ? kSel.x : lf.x, kSel ? kSel.y : lf.y, input.time);
-      }
-    }
 
     if (input.bothHolding && pTarget && kSel && pTarget.id !== kSel.id) {
       drawBondBeam(ctx, pTarget.x, pTarget.y, kSel.x, kSel.y, input.bondCharge);
@@ -344,21 +334,9 @@ export class Renderer {
 
     ctx.restore();
 
-    // While dragging a new link, show it being drawn from the source universe to
-    // the cursor; otherwise, while holding a universe, show the love beam into it.
-    if (input.connecting && input.dragFromId !== null && input.pointer.pos && input.cameraOffset) {
-      const fromNode = mv.graph.get(input.dragFromId);
-      if (fromNode) {
-        drawConnectDrag(
-          ctx,
-          fromNode.x + input.cameraOffset.x,
-          fromNode.y + input.cameraOffset.y,
-          input.pointer.pos.x,
-          input.pointer.pos.y,
-          input.time,
-        );
-      }
-    } else if (input.pointer.pos && input.pointer.held && pTarget && input.cameraOffset) {
+    // While holding, a love beam from the cursor to the universe being filled;
+    // the links themselves appear live as edges as you sweep.
+    if (input.pointer.pos && input.pointer.held && pTarget && input.cameraOffset) {
       drawLoveBeam(
         ctx,
         input.pointer.pos.x,
