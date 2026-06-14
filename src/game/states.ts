@@ -29,6 +29,6 @@ export function layoutForViewport(cssW: number, cssH: number): WorldLayout {
 
 // UI / control feel limits (the LIMITS table — don't scatter these numbers).
 export const LIMITS = {
-  pointerReach: 46, // design-space px radius for the P1 pointer to grab a node
+  pointerReach: 60, // design-space px radius to catch the universe under the cursor (forgiving sweep)
   keyHopCooldown: 0.12, // s between P2 keyboard hops, so a held key steps cleanly
 } as const;

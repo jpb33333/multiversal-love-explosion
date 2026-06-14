@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-06-13
+
+### Changed
+
+- **Connecting is now a fluid LOVE SWEEP**, not precise pair-wiring. Hold the
+  mouse and drag across universes — each one you pass fills with love and links
+  into a glowing strand, no aiming. Player 2: hold SPACE and move with arrows to
+  love + link as you go. Far easier and smoother to build the web on the fly
+  (the old drag-a-pair / Enter-grab connecting was too fiddly mid-game).
+- Forgiving catch radius; coach, how-to, and in-game help updated to the sweep.
+
 ## [0.5.0] — 2026-06-13
 
 ### Added
