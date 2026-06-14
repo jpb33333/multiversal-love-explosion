@@ -51,7 +51,7 @@ export interface RenderInput {
   cameraOffset: { x: number; y: number } | null; // world → design-center translation
   centroidTrail: Trail;
   pointer: { pos: { x: number; y: number } | null; targetId: number | null; held: boolean };
-  keyCursor: { selectedId: number | null };
+  keyCursor: { selectedId: number | null; linkFromId: number | null };
   bondCharge: number; // 0..1 — drives the bond-beam intensity
   bothHolding: boolean; // both players pouring (show the bond beam)
   p2Active: boolean; // P2 has joined — only then is their cursor shown
@@ -232,7 +232,7 @@ export class Renderer {
     const w = this.layout.width;
     const h = this.layout.height;
     drawHowtoCard(this.ctx, w, h);
-    const begin: CanvasButton = { label: 'Begin', x: w / 2 - 100, y: h * 0.16 + 344, width: 200, height: 50 };
+    const begin: CanvasButton = { label: 'Begin', x: w / 2 - 100, y: h * 0.16 + 384, width: 200, height: 50 };
     drawButton(this.ctx, begin, {
       primary: palette.love,
       hovered: this.hoveredButton(input.hover) === 'begin',
@@ -329,6 +329,13 @@ export class Renderer {
     if (kSel) {
       drawSelectionRing(ctx, kSel.x, kSel.y, input.time);
       drawCursorLabel(ctx, kSel.x, kSel.y + 4, 'P2', palette.player2);
+    }
+    // P2's in-progress keyboard link: from the grabbed source to their cursor.
+    if (input.p2Active && input.keyCursor.linkFromId !== null) {
+      const lf = mv.graph.get(input.keyCursor.linkFromId);
+      if (lf) {
+        drawConnectDrag(ctx, lf.x, lf.y, kSel ? kSel.x : lf.x, kSel ? kSel.y : lf.y, input.time);
+      }
     }
 
     if (input.bothHolding && pTarget && kSel && pTarget.id !== kSel.id) {
