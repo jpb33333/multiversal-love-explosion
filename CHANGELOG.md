@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-06-13
+
+### Added
+
+- **Player 2 can connect too (keyboard):** press ENTER on a universe to grab it,
+  move to another, press ENTER again to link them — the keyboard mirror of the
+  mouse drag. Now both players build the same web side by side, which is how the
+  duo was always meant to work. SPACE still pours love; ENTER now connects.
+
+### Changed
+
+- How-to card and in-game help rewritten to spell out both players' controls.
+
 ## [0.4.0] — 2026-06-13
 
 ### Changed

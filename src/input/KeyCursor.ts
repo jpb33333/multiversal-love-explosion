@@ -16,14 +16,16 @@ const MOVE_KEYS: Record<string, { x: number; y: number }> = {
   ArrowRight: { x: 1, y: 0 },
   KeyD: { x: 1, y: 0 },
 };
-const NURTURE_KEYS = new Set(['Space', 'Enter']);
+const NURTURE_KEYS = new Set(['Space']); // ENTER is now P2's connect key
 
 export class KeyCursor {
   selectedId: number | null = null;
+  linkFromId: number | null = null; // universe P2 grabbed as a link source
   private held = new Set<string>();
   private nurtureHeld = false;
   private hopCd = 0;
   private everPressed = false; // P2 only "exists" once they press a key
+  private pendingLink: { from: number; to: number } | null = null;
 
   // Returns true if the key is one we handle (so the Game can preventDefault and
   // stop the page from scrolling on arrows/space).
@@ -38,7 +40,33 @@ export class KeyCursor {
       this.everPressed = true;
       return true;
     }
+    if (code === 'Enter') {
+      this.everPressed = true;
+      this.handleConnectKey();
+      return true;
+    }
     return false;
+  }
+
+  // Player 2's connect: ENTER on a universe grabs it as a link source; ENTER on
+  // another links them; ENTER on the same one cancels.
+  private handleConnectKey(): void {
+    if (this.selectedId === null) return;
+    if (this.linkFromId === null) {
+      this.linkFromId = this.selectedId;
+    } else if (this.linkFromId !== this.selectedId) {
+      this.pendingLink = { from: this.linkFromId, to: this.selectedId };
+      this.linkFromId = null;
+    } else {
+      this.linkFromId = null;
+    }
+  }
+
+  // The Game polls this and performs the actual connection.
+  consumeLink(): { from: number; to: number } | null {
+    const l = this.pendingLink;
+    this.pendingLink = null;
+    return l;
   }
 
   onKeyUp(code: string): void {
@@ -59,6 +87,7 @@ export class KeyCursor {
   step(mv: Multiverse, dt: number): void {
     if (!this.everPressed) return; // P2 hasn't joined — no cursor, no auto-grab
     if (this.selectedId !== null && !mv.graph.has(this.selectedId)) this.selectedId = null;
+    if (this.linkFromId !== null && !mv.graph.has(this.linkFromId)) this.linkFromId = null;
 
     if (this.hopCd > 0) this.hopCd -= dt;
     let dx = 0;
@@ -86,6 +115,8 @@ export class KeyCursor {
     this.nurtureHeld = false;
     this.hopCd = 0;
     this.selectedId = null;
+    this.linkFromId = null;
+    this.pendingLink = null;
     this.everPressed = false;
   }
 }

@@ -243,7 +243,11 @@ export class Game {
         this.dragFromId !== null &&
         this.p1Target !== null &&
         this.p1Target !== this.dragFromId;
-      if (this.state === 'playing') this.keyCursor.step(this.mv, dt);
+      if (this.state === 'playing') {
+        this.keyCursor.step(this.mv, dt);
+        const link = this.keyCursor.consumeLink(); // P2 finished a keyboard connect
+        if (link && this.mv.connect(link.from, link.to)) this.hasConnected = true;
+      }
 
       this.advanceSim(dt);
 
@@ -455,7 +459,7 @@ export class Game {
       cameraOffset: this.cameraOffset,
       centroidTrail: this.centroidTrail,
       pointer: { pos: this.pointer.pos, targetId: this.p1Target, held: this.pointer.held },
-      keyCursor: { selectedId: this.keyCursor.selectedId },
+      keyCursor: { selectedId: this.keyCursor.selectedId, linkFromId: this.keyCursor.linkFromId },
       bondCharge: this.bond.chargeProgress,
       bothHolding: this.pointer.held && this.keyCursor.nurturing,
       p2Active: this.keyCursor.active,

@@ -200,8 +200,8 @@ export function drawResultCard(
 }
 
 export function drawHowtoCard(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  const cw = Math.min(680, w * 0.82);
-  const ch = 320;
+  const cw = Math.min(700, w * 0.84);
+  const ch = 360;
   const x = (w - cw) / 2;
   const y = h * 0.16;
 
@@ -219,13 +219,14 @@ export function drawHowtoCard(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.fillText('How to play', w / 2, y + cpx(46));
 
   const lines = [
-    'HOLD the mouse on a universe to fill it with love (your source of light).',
-    'Then DRAG from it to a nearby universe to CONNECT them — love rushes down the',
-    'new link and flows on through your web. Build it out, racing the entropy.',
-    'A settled cluster of loving universes LOCKS IN — banking love, easing pressure.',
+    'HOLD the mouse on a universe to fill it with love.',
+    'Then DRAG from it to a nearby universe to CONNECT them — love flows down the link.',
+    'Grow a web of loving universes; a settled cluster LOCKS IN, banking love.',
     'Win when the LOVE meter passes the ↑ mark; lose if entropy takes over.',
-    'PLAYER 2 (optional, keyboard): arrows / WASD move a second cursor, SPACE loves.',
-    'Playable solo, unstoppable as two. It speeds up — keep love ahead.',
+    '',
+    'TWO PLAYERS, one laptop: mouse = Player 1, keyboard = Player 2.',
+    'P2: arrows / WASD move · SPACE loves · ENTER connects',
+    '(press ENTER on one universe, move to another, press ENTER again).',
   ];
   ctx.fillStyle = rgba(palette.pearl, 0.82);
   ctx.font = `400 ${cpx(15)}px ${fonts.sans}`;
@@ -246,7 +247,7 @@ export function drawPlayingHelp(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.fillStyle = rgba(palette.mist, 0.4);
   ctx.font = `400 ${cpx(12)}px ${fonts.sans}`;
   ctx.fillText(
-    'HOLD a universe to love it   ·   DRAG between universes to connect   ·   P2: arrows+space   ·   M mutes',
+    'Mouse: HOLD to love, DRAG to connect   ·   P2: move, SPACE love, ENTER connect   ·   M mutes',
     w / 2,
     h - 16,
   );
