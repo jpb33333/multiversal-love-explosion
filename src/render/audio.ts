@@ -94,6 +94,11 @@ export class AudioEngine {
     [0, 4, 7, 12].forEach((st, i) => this.blip(base * 2 ** (st / 12), 0.5, 'triangle', 0.09, i * 0.05));
   }
 
+  // A quick rising "link" when you connect two universes.
+  connect(): void {
+    [523.25, 659.25].forEach((f, i) => this.blip(f, 0.18, 'triangle', 0.09, i * 0.05));
+  }
+
   // The co-op bond — a warm, full chord.
   bond(): void {
     const base = 261.63;

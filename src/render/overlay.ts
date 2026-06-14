@@ -219,13 +219,13 @@ export function drawHowtoCard(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.fillText('How to play', w / 2, y + cpx(46));
 
   const lines = [
-    'YOU (mouse): move over a universe and HOLD the button to fill it with love.',
-    'Love spreads to connected universes. Grow a glowing cluster and it LOCKS IN —',
-    'banking love and easing the pressure. Win when the LOVE meter passes the mark.',
-    'PLAYER 2 (optional, keyboard): arrow keys / WASD move a second cursor, SPACE loves.',
-    'THE BOND: P1 holds + P2 loves two connected universes at once to flood and lock',
-    'a whole region instantly — the late-game power move.',
-    'Playable solo, unstoppable as two. It speeds up — keep love ahead of entropy.',
+    'HOLD the mouse on a universe to fill it with love (your source of light).',
+    'Then DRAG from it to a nearby universe to CONNECT them — love rushes down the',
+    'new link and flows on through your web. Build it out, racing the entropy.',
+    'A settled cluster of loving universes LOCKS IN — banking love, easing pressure.',
+    'Win when the LOVE meter passes the ↑ mark; lose if entropy takes over.',
+    'PLAYER 2 (optional, keyboard): arrows / WASD move a second cursor, SPACE loves.',
+    'Playable solo, unstoppable as two. It speeds up — keep love ahead.',
   ];
   ctx.fillStyle = rgba(palette.pearl, 0.82);
   ctx.font = `400 ${cpx(15)}px ${fonts.sans}`;
@@ -246,7 +246,7 @@ export function drawPlayingHelp(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.fillStyle = rgba(palette.mist, 0.4);
   ctx.font = `400 ${cpx(12)}px ${fonts.sans}`;
   ctx.fillText(
-    'Mouse: hold a universe to love it   ·   Player 2 (optional): arrows + space   ·   M mutes',
+    'HOLD a universe to love it   ·   DRAG between universes to connect   ·   P2: arrows+space   ·   M mutes',
     w / 2,
     h - 16,
   );

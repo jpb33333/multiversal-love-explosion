@@ -18,6 +18,7 @@ import {
   drawTargetRing,
   drawBondBeam,
   drawLoveBeam,
+  drawConnectDrag,
   drawCoachHighlight,
   drawCursorLabel,
 } from './cursors.ts';
@@ -55,6 +56,8 @@ export interface RenderInput {
   bothHolding: boolean; // both players pouring (show the bond beam)
   p2Active: boolean; // P2 has joined — only then is their cursor shown
   coach: { text: string; targetId: number | null } | null; // onboarding hint
+  connecting: boolean; // the player is dragging a new link
+  dragFromId: number | null; // the universe a drag started from
   peakLoveShare: number;
   stats: StatsSummary;
 }
@@ -334,9 +337,21 @@ export class Renderer {
 
     ctx.restore();
 
-    // Love beam from the cursor to its target (drawn in design space so it
-    // starts exactly at the mouse).
-    if (input.pointer.pos && input.pointer.held && pTarget && input.cameraOffset) {
+    // While dragging a new link, show it being drawn from the source universe to
+    // the cursor; otherwise, while holding a universe, show the love beam into it.
+    if (input.connecting && input.dragFromId !== null && input.pointer.pos && input.cameraOffset) {
+      const fromNode = mv.graph.get(input.dragFromId);
+      if (fromNode) {
+        drawConnectDrag(
+          ctx,
+          fromNode.x + input.cameraOffset.x,
+          fromNode.y + input.cameraOffset.y,
+          input.pointer.pos.x,
+          input.pointer.pos.y,
+          input.time,
+        );
+      }
+    } else if (input.pointer.pos && input.pointer.held && pTarget && input.cameraOffset) {
       drawLoveBeam(
         ctx,
         input.pointer.pos.x,
