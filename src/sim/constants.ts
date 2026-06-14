@@ -43,7 +43,7 @@ export const SPAWN = {
   DIST_JITTER: 22, // ± jitter on that distance
   MIN_GAP: 46, // reject a spawn closer than this to any existing node
   PLACE_ATTEMPTS: 10, // tries to find an open spot before skipping the spawn
-  K_NEIGHBORS: 4, // max proximity edges wired per spawn (bounded degree)
+  K_NEIGHBORS: 2, // few auto-edges — the PLAYER wires the rest (drag to connect)
   EDGE_MAX_DIST: 120, // world-unit cap on edge length (> DIST → several visible edges)
   LOVE_JITTER: 0.03, // ± initial love spread for a fresh potential
   LOVE_SEEDED: 0.66, // initial love for a node spawned on a lock-in credit
@@ -72,4 +72,9 @@ export const BOND = {
   CHARGE_SECONDS: 0.6, // both caresses held this long to fire
   MAX_NODES: 16, // cap on the love-bridge neighborhood converted
   COOLDOWN_SECONDS: 6.0, // shared couple cooldown — decisive, not spammable
+} as const;
+
+export const CONNECT = {
+  MAX_DIST: 210, // farthest two universes you can link by dragging (world px)
+  CHANNEL: 0.55, // how strongly a fresh link pulls the target toward the source's love
 } as const;

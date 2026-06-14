@@ -48,6 +48,9 @@ export class Game {
   private coachFadeT = 0;
   private hasPouredLove = false;
   private firstLockSeen = false;
+  private hasConnected = false;
+  private dragFromId: number | null = null; // universe a drag started from
+  private connecting = false; // currently dragging a new link
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -75,11 +78,14 @@ export class Game {
         const p = this.renderer.screenToLogical(e);
         this.pointer.setPos(p);
         const consumedByButton = this.onClick(p);
-        if (!consumedByButton && this.state === 'playing') this.pointer.press();
+        if (!consumedByButton && this.state === 'playing') {
+          this.pointer.press();
+          this.dragFromId = this.computeP1Target(); // the universe a drag would start from
+        }
       },
       { passive: false },
     );
-    window.addEventListener('pointerup', () => this.pointer.release());
+    window.addEventListener('pointerup', () => this.onPointerUp());
     canvas.addEventListener('pointerleave', () => {
       this.pointer.setPos(null);
       this.pointer.release();
@@ -169,6 +175,9 @@ export class Game {
     this.coachFadeT = 0;
     this.hasPouredLove = false;
     this.firstLockSeen = false;
+    this.hasConnected = false;
+    this.dragFromId = null;
+    this.connecting = false;
     this.state = 'playing';
   }
 
@@ -229,12 +238,18 @@ export class Game {
         }
       }
       this.p1Target = this.computeP1Target();
+      this.connecting =
+        this.pointer.held &&
+        this.dragFromId !== null &&
+        this.p1Target !== null &&
+        this.p1Target !== this.dragFromId;
       if (this.state === 'playing') this.keyCursor.step(this.mv, dt);
 
       this.advanceSim(dt);
 
       if (c) this.centroidTrail.push(c.x, c.y);
       this.drainLockEvents();
+      this.drainConnectEvents();
       this.audio.setLove(this.mv.tally().loveShare);
 
       if (this.state === 'playing') {
@@ -290,11 +305,13 @@ export class Game {
     if (!this.coaching) return;
     if (!this.hasPouredLove) {
       this.coachStep = 0;
-    } else if (!this.firstLockSeen) {
+    } else if (!this.hasConnected) {
       this.coachStep = 1;
+    } else if (!this.firstLockSeen) {
+      this.coachStep = 2;
     } else {
-      if (this.coachStep < 2) {
-        this.coachStep = 2;
+      if (this.coachStep < 3) {
+        this.coachStep = 3;
         this.coachFadeT = 4;
       }
       this.coachFadeT -= dt;
@@ -312,13 +329,16 @@ export class Game {
       };
     }
     if (this.coachStep === 1) {
-      return { text: 'Now love its neighbours — grow a glowing cluster', targetId: null };
+      return { text: 'Now DRAG from that universe to a nearby one to connect them', targetId: null };
     }
-    if (this.coachStep === 2 && this.coachFadeT > 0) {
+    if (this.coachStep === 2) {
       return {
-        text: 'Locked in! Keep love spreading — win when LOVE passes the ↑ mark',
+        text: 'Love flows along your links — connect more to grow a glowing web',
         targetId: null,
       };
+    }
+    if (this.coachStep === 3 && this.coachFadeT > 0) {
+      return { text: 'A cluster locked in! Win when LOVE passes the ↑ mark', targetId: null };
     }
     return null;
   }
@@ -339,8 +359,8 @@ export class Game {
     if (!this.mv) return;
     const p1 = this.p1Target;
     const p2 = this.keyCursor.selectedId;
-    if (this.pointer.held && p1 !== null) {
-      this.mv.nurture(p1);
+    if (this.pointer.held && p1 !== null && p1 === this.dragFromId) {
+      this.mv.nurture(p1); // pour love only while holding the universe you grabbed
       this.hasPouredLove = true;
     }
     if (this.keyCursor.nurturing && p2 !== null) {
@@ -392,6 +412,36 @@ export class Game {
     this.mv.lockEvents.length = 0;
   }
 
+  // Turn each player-drawn link into a spark + sound at its midpoint.
+  private drainConnectEvents(): void {
+    if (!this.mv) return;
+    const off = this.cameraOffset ?? { x: 0, y: 0 };
+    for (const ev of this.mv.connectEvents) {
+      this.audio.connect();
+      this.renderer.burst(
+        (ev.ax + ev.bx) / 2 + off.x,
+        (ev.ay + ev.by) / 2 + off.y,
+        10,
+        palette.loveBright,
+        160,
+      );
+    }
+    this.mv.connectEvents.length = 0;
+  }
+
+  // On release: if the drag ended on a different nearby universe, wire them.
+  private onPointerUp(): void {
+    if (this.mv && this.state === 'playing' && this.dragFromId !== null) {
+      const drop = this.computeP1Target();
+      if (drop !== null && drop !== this.dragFromId && this.mv.connect(this.dragFromId, drop)) {
+        this.hasConnected = true;
+      }
+    }
+    this.dragFromId = null;
+    this.connecting = false;
+    this.pointer.release();
+  }
+
   private render(dt: number): void {
     const tally = this.mv ? this.mv.tally() : null;
     const input: RenderInput = {
@@ -410,6 +460,8 @@ export class Game {
       bothHolding: this.pointer.held && this.keyCursor.nurturing,
       p2Active: this.keyCursor.active,
       coach: this.coachInfo(),
+      connecting: this.connecting,
+      dragFromId: this.dragFromId,
       peakLoveShare: this.classifier.peakLoveShare,
       stats: this.stats,
     };

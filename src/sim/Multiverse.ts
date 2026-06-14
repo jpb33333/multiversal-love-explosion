@@ -6,7 +6,7 @@
 
 import { GraphStore, type MvNode } from './graph.ts';
 import { mulberry32 } from './rng.ts';
-import { SIM, CONTAGION, ENTROPY, SPAWN, LOCK, CULL } from './constants.ts';
+import { SIM, CONTAGION, ENTROPY, SPAWN, LOCK, CULL, CONNECT } from './constants.ts';
 import { clamp } from '../utils/clamp.ts';
 import { stepContagion } from './contagion.ts';
 import { seedCluster, spawnOne } from './spawn.ts';
@@ -52,6 +52,7 @@ export class Multiverse {
   loveSpawnCredits = 0;
   lockBank: { love: number; t: number }[] = [];
   lockEvents: LockEvent[] = []; // drained by the Game each frame (→ bursts)
+  connectEvents: { ax: number; ay: number; bx: number; by: number }[] = []; // player links (→ fx)
   constellation: ConstellationPoint[] = []; // render-only memorial of culled nodes
 
   private nextId = 1;
@@ -180,6 +181,27 @@ export class Multiverse {
     const n = this.graph.get(id);
     if (!n || n.state === 'locked') return;
     n.nudge = CONTAGION.NUDGE;
+  }
+
+  // Wire two nearby universes together (the player dragged from `from` to `to`).
+  // Love rushes from the more-loving end into the other right away, then keeps
+  // flowing along the new permanent edge via contagion. Returns false if the
+  // link is invalid (same node, locked, or too far apart).
+  connect(from: number, to: number): boolean {
+    if (from === to) return false;
+    const nf = this.graph.get(from);
+    const nt = this.graph.get(to);
+    if (!nf || !nt || nf.state === 'locked' || nt.state === 'locked') return false;
+    const dx = nf.x - nt.x;
+    const dy = nf.y - nt.y;
+    if (dx * dx + dy * dy > CONNECT.MAX_DIST * CONNECT.MAX_DIST) return false;
+    this.graph.addEdge(from, to);
+    // Channel love from the source into the target — but only ever upward.
+    if (nf.love > nt.love) {
+      nt.love = clamp(nt.love + (nf.love - nt.love) * CONNECT.CHANNEL, 0, 1);
+    }
+    this.connectEvents.push({ ax: nf.x, ay: nf.y, bx: nt.x, by: nt.y });
+    return true;
   }
 
   // ── queries (render / outcome / cursors read these; none mutate) ──

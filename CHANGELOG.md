@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-06-13
+
+### Changed
+
+- New core verb — **CONNECT**: hold a universe to fill it with love, then DRAG
+  from it to a nearby universe to wire them together. Love rushes down the link
+  you draw and flows on through your web. (Replaces the implicit "love just
+  spreads on its own" model that players found unclear — you now build the
+  network yourself, which is what the game always wanted to be.)
+- Sparser auto-edges so your connections matter; a "drawing a link" line while
+  dragging, plus a spark + sound when a link forms.
+- Onboarding rewritten to teach it: hold to love → drag to connect → grow the
+  web. How-to and in-game help updated to match.
+
 ## [0.3.0] — 2026-06-13
 
 ### Changed
