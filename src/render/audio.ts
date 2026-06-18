@@ -88,21 +88,15 @@ export class AudioEngine {
     this.blip(640 + love * 680, 0.12, 'sine', 0.05);
   }
 
-  // A little bell arpeggio when a cluster locks in; brighter for bigger clusters.
-  lock(size: number): void {
-    const base = 392 + Math.min(size, 16) * 9;
-    [0, 4, 7, 12].forEach((st, i) => this.blip(base * 2 ** (st / 12), 0.5, 'triangle', 0.09, i * 0.05));
+  // A bright bell when a universe bursts into JOY.
+  loveBurst(): void {
+    [392, 494, 587, 784].forEach((f, i) => this.blip(f, 0.5, 'triangle', 0.1, i * 0.05));
   }
 
-  // A quick rising "link" when you connect two universes.
-  connect(): void {
-    [523.25, 659.25].forEach((f, i) => this.blip(f, 0.18, 'triangle', 0.09, i * 0.05));
-  }
-
-  // The co-op bond — a warm, full chord.
-  bond(): void {
-    const base = 261.63;
-    [0, 4, 7, 11, 14].forEach((st, i) => this.blip(base * 2 ** (st / 12), 0.9, 'triangle', 0.11, i * 0.04));
+  // A low thud when a universe bursts into DARKNESS (an outbreak).
+  darkBurst(): void {
+    this.blip(150, 0.4, 'sawtooth', 0.12);
+    this.blip(98, 0.5, 'sine', 0.1, 0.02);
   }
 
   // The Love Explosion — a rising major run that blooms upward.

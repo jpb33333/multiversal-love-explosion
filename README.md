@@ -1,29 +1,29 @@
 # Multiversal Love Explosion
 
-A two-player, same-screen co-op game about helping **love** outshine **entropy**
-across an ever-expanding network of universes.
+A 1–2 player co-op game about holding back entropy across a network of universes
+— and tipping it into joy. The core is borrowed from Pandemic's outbreak
+cascades.
 
-The multiverse is a living graph: each node is a universe, each edge a
-connection to a neighbor. Two forces spread across the edges every moment —
-love (from loving neighbors and your touch) and entropy (a constant, growing
-drag). You and your partner nurture undecided universes toward love; when a
-cluster of loving universes settles, you **lock it in** — it crystallizes,
-banks toward victory, relieves the pressure, and fades into the background
-constellation. New universes bloom faster and faster. Tip the balance
-decisively and the multiverse goes off in a **Love Explosion** (you win). Let
-entropy take over and it ends in **Entropy Collapse** (you lose).
+The multiverse is a web of universes. Each one slowly cools toward **entropy**;
+when one bottoms out it **overflows**, bursting darkness onto its neighbors,
+which can chain into an outbreak. You and your partner pour **love** into
+universes to hold the line — and when you fill one all the way, it overflows the
+other way: a **burst of joy** that splashes love to its neighbors.
 
-Because locked and dead universes are continually culled from the live
-simulation, only a few hundred are ever active at once — so the multiverse can
-expand effectively **forever**, the escalation is what forces a resolution.
+Two race tracks sit at the top of the screen. Rack up enough **love-bursts** and
+the multiverse goes off in a **Love Explosion** (you win). Let too many
+**entropy-outbreaks** stack up and it ends in **Entropy Collapse** (you lose).
+The pressure rises over time — entropy cools faster the longer you play.
 
 ## Play
 
-- **Player 1 — pointer/touch.** Move over a universe and hold to pour love into it.
-- **Player 2 — keyboard.** Arrow keys / WASD hop your selector between universes; Space (or Enter) pours love.
-- **The love bond.** When *both* of you hold a caress on two nearby-connected
-  universes at once, you forge a bond: it floods a whole neighborhood with love
-  and can lock it in instantly. Late game, you can only win by bonding together.
+- **Player 1 — mouse:** hover over a universe and **hold** to pour in love.
+- **Player 2 — keyboard:** **arrows / WASD** move your cursor, **Space** pours love.
+- **M** mutes the sound.
+
+Watch a universe's color (cold = entropy, warm = love) and the pulsing rings: a
+cold pulse means it's about to outbreak; a warm pulse means it's about to burst
+with joy.
 
 ## Develop
 
@@ -35,7 +35,7 @@ npm run build    # type-check + production bundle in dist/
 ```
 
 Vanilla TypeScript + Vite + Vitest, Canvas 2D, **zero runtime dependencies**.
-See `CLAUDE.md` for house rules and `docs/` for the design.
+See `CLAUDE.md` for house rules and `docs/DESIGN.md` for the design.
 
 ## License
 

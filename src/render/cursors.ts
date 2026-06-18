@@ -63,27 +63,6 @@ export function drawTargetRing(
   ctx.restore();
 }
 
-// The charging/firing line of a co-op bond between the two players' targets.
-export function drawBondBeam(
-  ctx: CanvasRenderingContext2D,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-  progress: number,
-): void {
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = rgba(palette.loveBright, 0.25 + 0.65 * progress);
-  ctx.lineWidth = 1 + 5 * progress;
-  ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(bx, by);
-  ctx.stroke();
-  ctx.restore();
-}
-
 // A rose beam from the P1 cursor to the universe it's filling — makes "I'm
 // loving THIS one" unmistakable.
 export function drawLoveBeam(

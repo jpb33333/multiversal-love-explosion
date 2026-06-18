@@ -1,80 +1,57 @@
-// All tunable simulation numbers, grouped by concern (BW's PHYSICS / LIMITS
-// idiom). Nothing here imports anything; don't scatter a magic number elsewhere
-// — add it to the right table. Units are game-feel-tuned, not physical: love is
-// a unitless 0..1 order parameter, positions are design-space px, time is
-// seconds. (v0.3.0: tuned denser + more responsive + solo-winnable.)
+// Every tunable number for the simulation, grouped by concern. Pandemic-style
+// core: universes sit on a network, cool toward entropy, and OVERFLOW (cascade
+// to their neighbours) at either extreme — dark when they bottom out, joyful
+// when you fill them with love. Nothing here imports anything.
 
 export const SIM = {
   DT: 1 / 60, // one fixed logic tick; drained from an accumulator in Game
-  WARMUP_SECONDS: 2.0, // grace before the win/lose classifier may fire
-  MAX_LIVE_NODES: 600, // hard ceiling on live nodes (keeps the sim cheap + bounded)
-  CONSTELLATION_MAX: 2000, // FIFO cap on render-only culled-node memorial points
-  SEED: 0x10ce10e5, // deterministic Mulberry32 seed (reproducible runs + tests)
+  WARMUP_SECONDS: 1.5, // grace before the win/lose check can fire
+  MAX_LIVE_NODES: 520, // hard ceiling on live universes (keeps it cheap + bounded)
+  CONSTELLATION_MAX: 1500, // FIFO cap on render-only memorial points
+  SEED: 0x10ce10e5, // deterministic Mulberry32 seed
 } as const;
 
-export const CONTAGION = {
-  GAIN: 1.0, // neighbor-field strength per second (must beat ENTROPY.BASE)
-  RECENTER: 0.4, // /s pull of ISOLATED potentials back to 0.5 (kills numeric drift)
-  COMMIT_HI: 0.8, // potential → loving at/above this …
-  COMMIT_LO: 0.2, // potential → unloving at/below this …
-  COMMIT_DWELL: 0.4, // … once the threshold has held this many seconds (anti-flicker)
-  RELAPSE_LO: 0.35, // loving relapses to potential below this (hysteresis)
-  RELAPSE_HI: 0.65, // unloving relapses to potential above this (hysteresis)
-  NUDGE: 1.4, // love/s a held player caress injects — punchy so holding feels alive
-  NUDGE_MAX_PER_TICK: 0.08, // hard cap on a single node's nudge gain per tick (anti-spam)
+// How love moves: gentle pull toward neighbours, plus the player's pour.
+export const FIELD = {
+  NEIGHBOR_PULL: 0.35, // /s — a universe eases toward the average of its neighbours
+  POUR: 1.7, // love/s a player pours into the universe they hold
+  POUR_MAX_PER_TICK: 0.06, // cap on pour gain per tick (anti-spam)
 } as const;
 
+// The ambient cooling — entropy is the house edge, and it grows over time.
 export const ENTROPY = {
-  BASE: 0.05, // baseline love drain /s — entropy is the house edge
-  RAMP_PER_MIN: 0.042, // added to the drain per elapsed minute (escalation)
-  MAX: 0.42, // drain ceiling so late game is brutal, not instant-death
-  PRESSURE_PER_UNLOVING: 0.0008, // extra drain /s per live unloving node (losing boards harden)
-  PRESSURE_MAX: 0.15, // cap on the pressure term
-  RELIEF_DECAY: 5.0, // seconds for a lock-in's entropy relief to fade
+  BASE: 0.06, // /s baseline love drain on every universe
+  RAMP_PER_MIN: 0.05, // added to the drain per elapsed minute (the rising pressure)
+  MAX: 0.42, // drain ceiling
 } as const;
 
 export const SPAWN = {
-  SEED_COUNT: 18, // nodes placed at t=0 so the first cluster can grow
-  SEED_RADIUS: 120, // world radius of the initial seed disc (tight = reads as a cluster)
-  RATE_BASE: 3.0, // spawns/s at t=0
-  RATE_RAMP_PER_MIN: 2.2, // +spawns/s per elapsed minute
-  RATE_MAX: 15.0, // spawns/s ceiling ("too much" target)
-  DIST: 70, // distance a new node sits from its anchor node (tighter = denser web)
-  DIST_JITTER: 22, // ± jitter on that distance
-  MIN_GAP: 46, // reject a spawn closer than this to any existing node
-  PLACE_ATTEMPTS: 10, // tries to find an open spot before skipping the spawn
-  K_NEIGHBORS: 2, // few auto-edges — the PLAYER wires the rest (drag to connect)
-  EDGE_MAX_DIST: 120, // world-unit cap on edge length (> DIST → several visible edges)
-  LOVE_JITTER: 0.03, // ± initial love spread for a fresh potential
-  LOVE_SEEDED: 0.66, // initial love for a node spawned on a lock-in credit
+  SEED_COUNT: 30, // universes in the starting cluster
+  SEED_RADIUS: 240, // world radius of the seed disc
+  RATE_BASE: 2.5, // new universes/s
+  RATE_RAMP_PER_MIN: 0.8, // +/s per minute (the multiverse keeps growing)
+  RATE_MAX: 6.0,
+  DIST: 78, // distance a new universe sits from its anchor
+  DIST_JITTER: 24,
+  MIN_GAP: 52, // reject a spawn closer than this to any universe
+  PLACE_ATTEMPTS: 10,
+  K_NEIGHBORS: 3, // edges per new universe (a real web, like a Pandemic map)
+  EDGE_MAX_DIST: 132, // world-unit cap on edge length
+  LOVE_JITTER: 0.03, // ± initial love spread (universes start ~neutral)
 } as const;
 
-export const LOCK = {
-  SCAN_INTERVAL: 0.25, // seconds between connected-component lock scans (cost control)
-  MIN_SIZE: 5, // loving-cluster size to auto-lock (the "shape" you built)
-  MIN_MEAN_LOVE: 0.82, // cluster must be genuinely loving, not borderline
-  STABILITY_SECONDS: 0.6, // every member loving this long (settled, not a fluke)
-  FADE_SECONDS: 2.0, // locked → culled fade duration (then banked to constellation)
-  BASE_SCORE: 10, // points per node locked
-  MEAN_BONUS: 8, // extra points × size × meanLove (rewards purity)
-  RELIEF: 0.012, // entropy relief /s per node locked (the breather)
-  SPAWN_CREDIT: 0.6, // love-seeded frontier spawns granted per node locked
-  BANK_WINDOW: 14, // seconds a lock's love counts toward the win love-share
+// The overflow / cascade — the heart of the game.
+export const OVERFLOW = {
+  ENTROPY_AT: 0.04, // love at/below this → the universe overflows into DARKNESS
+  LOVE_AT: 0.96, // love at/above this → it overflows into JOY
+  LOVE_SPLASH: 0.2, // a joy-burst lifts each neighbour modestly — you build love up
+  DARK_SPLASH: 0.4, // a dark outbreak shoves hard — dangerous, chains easily
+  FADE_SECONDS: 0.9, // an overflowed universe bursts, fades, then is culled
 } as const;
 
-export const CULL = {
-  UNLOVING_MIN_AGE: 6, // seconds before an unloving node is eligible to be culled
-  STRANDED_DWELL: 3, // seconds with no living neighbor before a "dark star" is banked
-} as const;
-
-export const BOND = {
-  MAX_PATH: 3, // max edge-distance between the two bonded targets
-  CHARGE_SECONDS: 0.6, // both caresses held this long to fire
-  MAX_NODES: 16, // cap on the love-bridge neighborhood converted
-  COOLDOWN_SECONDS: 6.0, // shared couple cooldown — decisive, not spammable
-} as const;
-
-export const CONNECT = {
-  MAX_DIST: 210, // farthest two universes you can link by dragging (world px)
-  CHANNEL: 0.55, // how strongly a fresh link pulls the target toward the source's love
+// Win/lose: two race tracks, like Pandemic's cure markers vs the outbreak track.
+export const OUTCOME = {
+  warmupSeconds: 1.5,
+  winLoveOverflows: 30, // this many bursts of joy → Love Explosion (win)
+  loseEntropyOverflows: 12, // this many dark outbreaks → Entropy Collapse (lose)
 } as const;
