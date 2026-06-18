@@ -65,7 +65,7 @@ export class LoveOutcomeClassifier {
       this.takeoffTimer = 0;
     }
 
-    if (mv.peakLit >= this.cfg.extinctionMinPeak && mv.litCount === 0) {
+    if (mv.peakLit >= this.cfg.extinctionMinPeak && mv.litCount <= 2) {
       this.resolved = { kind: 'entropy_collapse' };
     }
     return this.resolved;

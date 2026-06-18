@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] — 2026-06-18
+
+### Changed
+
+- **Balance + chain-reaction feel.** Strengthened spread-born love
+  (`SPREAD.SEED_SIGNAL` 0.45 → 0.6) so each click sends a visible ripple a few
+  hops deep — a real network effect — while keeping R₀ < 1 so the wavefront
+  still dies without fresh clicks. Steepened the decay ramp
+  (`DECAY.RAMP_PER_MIN` 0.55 → 1.0, `MAX` 3.0 → 6.0) so every run that doesn't
+  go viral now collapses — no more permanent stalemate. Lowered the viral
+  target (`TAKEOFF.TARGET` 40 → 30) and lengthened the hold
+  (`TAKEOFF.DWELL` 0.7 → 1.0) so winning means *sustaining* takeoff, not a
+  one-frame spike. Burnout now fires when a caught chain collapses to ≤ 2 lit
+  (was exactly 0), so a clicking-but-failing player can actually lose instead
+  of turtling forever.
+- The resulting curve (headless probe, `tests/balance.test.ts`): idle burns out
+  in seconds; a slow solo rate (~4/s) burns out in under a minute after a
+  near-miss; a frantic two-handed rate (~12/s) goes viral. New tests lock that
+  shape so future tuning can't silently break it.
+
 ## [0.8.0] — 2026-06-18
 
 ### Changed
