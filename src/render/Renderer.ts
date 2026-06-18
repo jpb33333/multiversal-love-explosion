@@ -16,7 +16,6 @@ import {
   drawPointerCursor,
   drawSelectionRing,
   drawTargetRing,
-  drawBondBeam,
   drawLoveBeam,
   drawCoachHighlight,
   drawCursorLabel,
@@ -25,8 +24,7 @@ import {
   type CanvasButton,
   drawButton,
   drawWordmark,
-  drawMeter,
-  drawScore,
+  drawOverflowTracks,
   drawResultCard,
   drawTitleStats,
   drawHowtoCard,
@@ -38,28 +36,25 @@ import { DEFAULT_OUTCOME_CONFIG } from '../game/outcomes.ts';
 import type { StatsSummary } from '../game/stats.ts';
 
 // Everything the Renderer needs for a frame. It only READS this — the Renderer
-// never mutates the simulation (the pure/view boundary).
+// never mutates the simulation.
 export interface RenderInput {
   state: GameStateKind;
-  time: number; // wall-clock seconds since boot — for starfield/cursor animation
-  simTime: number; // multiverse sim time — for lock-in fade (0 when no sim)
+  time: number; // wall-clock seconds since boot — starfield / cursor animation
+  simTime: number; // multiverse sim time — node burst-fade timing (0 when no sim)
   dt: number;
   hover: { x: number; y: number } | null;
   mv: Multiverse | null;
   tally: Tally | null;
-  cameraOffset: { x: number; y: number } | null; // world → design-center translation
+  cameraOffset: { x: number; y: number } | null; // world → design-centre translation
   centroidTrail: Trail;
   pointer: { pos: { x: number; y: number } | null; targetId: number | null; held: boolean };
   keyCursor: { selectedId: number | null };
-  bondCharge: number; // 0..1 — drives the bond-beam intensity
-  bothHolding: boolean; // both players pouring (show the bond beam)
   p2Active: boolean; // P2 has joined — only then is their cursor shown
   coach: { text: string; targetId: number | null } | null; // onboarding hint
-  peakLoveShare: number;
+  peakLoveShare: number; // 0..1 progress for the result card
   stats: StatsSummary;
 }
 
-// Apple HIG min touch target; button rects inflate to this on hit-test.
 const TOUCH_TARGET_MIN_CSS = 44;
 const TAU = Math.PI * 2;
 
@@ -115,7 +110,6 @@ export class Renderer {
     return this.currentLayout;
   }
 
-  // Map a pointer event to design-space coords, inverting the contain-fit.
   screenToLogical(event: MouseEvent): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
     return {
@@ -128,8 +122,6 @@ export class Renderer {
     this.burstLayer.burst(x, y, count, color, speed);
   }
 
-  // The button under the pointer, if any — each rect inflated (centered) to the
-  // touch-target floor so small on-screen buttons stay tappable.
   hoveredButton(p: { x: number; y: number } | null): string | null {
     if (!p) return null;
     const minSide = TOUCH_TARGET_MIN_CSS / this.fit.scale;
@@ -156,17 +148,14 @@ export class Renderer {
     const { ctx } = this;
     setViewScale(this.fit.scale);
 
-    // Regime 1 — identity: fill the whole device buffer with the void.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = palette.voidDeep;
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Regime 2 — screen space (DPR only): full-bleed starfield + ambient drift.
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     drawStarfield(ctx, this.starfield, this.reducedMotion ? 0 : input.time, this.viewW, this.viewH);
     if (!this.reducedMotion) this.ambientLayer.ambient(this.viewW, this.viewH, input.dt);
 
-    // Regime 3 — scene (design space via the contain-fit transform).
     const m = this.dpr * this.fit.scale;
     ctx.setTransform(m, 0, 0, m, this.dpr * this.fit.offsetX, this.dpr * this.fit.offsetY);
     this.nextButtons.clear();
@@ -189,14 +178,11 @@ export class Renderer {
 
     if (input.state !== 'title' && input.state !== 'howto') this.drawCornerControls(input);
 
-    // Bursts are world events at design-space coords — render with the scene.
     this.burstLayer.draw(ctx);
 
-    // Ambient motes paint last, on top, full-bleed (back to screen space).
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (!this.reducedMotion) this.ambientLayer.draw(ctx);
 
-    // Publish this frame's button rects (back → front).
     const front = this.buttons;
     this.buttons = this.nextButtons;
     this.nextButtons = front;
@@ -209,14 +195,12 @@ export class Renderer {
     const h = this.layout.height;
     drawWordmark(this.ctx, w, h);
     drawTitleStats(this.ctx, w, h, input.stats);
-
     const begin: CanvasButton = { label: 'Begin', x: w / 2 - 100, y: h * 0.6, width: 200, height: 50 };
     drawButton(this.ctx, begin, {
       primary: palette.love,
       hovered: this.hoveredButton(input.hover) === 'begin',
     });
     this.register('begin', begin);
-
     const howto: CanvasButton = { label: 'How to play', x: w / 2 - 90, y: h * 0.6 + 64, width: 180, height: 40 };
     drawButton(this.ctx, howto, {
       primary: palette.mist,
@@ -229,7 +213,7 @@ export class Renderer {
     const w = this.layout.width;
     const h = this.layout.height;
     drawHowtoCard(this.ctx, w, h);
-    const begin: CanvasButton = { label: 'Begin', x: w / 2 - 100, y: h * 0.16 + 384, width: 200, height: 50 };
+    const begin: CanvasButton = { label: 'Begin', x: w / 2 - 100, y: h * 0.16 + 360, width: 200, height: 50 };
     drawButton(this.ctx, begin, {
       primary: palette.love,
       hovered: this.hoveredButton(input.hover) === 'begin',
@@ -239,10 +223,16 @@ export class Renderer {
 
   private renderPlaying(input: RenderInput): void {
     this.renderWorld(input);
-    if (input.tally) {
-      drawMeter(this.ctx, this.layout.width, input.tally.loveShare, DEFAULT_OUTCOME_CONFIG.winLoveShare);
+    if (input.mv) {
+      drawOverflowTracks(
+        this.ctx,
+        this.layout.width,
+        input.mv.loveOverflows,
+        DEFAULT_OUTCOME_CONFIG.winLoveOverflows,
+        input.mv.entropyOverflows,
+        DEFAULT_OUTCOME_CONFIG.loseEntropyOverflows,
+      );
     }
-    if (input.mv) drawScore(this.ctx, this.layout.width, input.mv.score);
     if (input.coach) drawCoachBanner(this.ctx, this.layout.width, input.coach.text);
     drawPlayingHelp(this.ctx, this.layout.width, this.layout.height);
   }
@@ -254,7 +244,6 @@ export class Renderer {
 
     this.renderWorld(input);
 
-    // A loss dims the field to embers; a win keeps it blooming under the card.
     if (!win) {
       this.ctx.save();
       this.ctx.fillStyle = rgba(palette.voidDeep, 0.5);
@@ -262,10 +251,17 @@ export class Renderer {
       this.ctx.restore();
     }
 
-    if (input.tally) {
-      drawMeter(this.ctx, w, input.tally.loveShare, DEFAULT_OUTCOME_CONFIG.winLoveShare);
+    if (input.mv) {
+      drawOverflowTracks(
+        this.ctx,
+        w,
+        input.mv.loveOverflows,
+        DEFAULT_OUTCOME_CONFIG.winLoveOverflows,
+        input.mv.entropyOverflows,
+        DEFAULT_OUTCOME_CONFIG.loseEntropyOverflows,
+      );
     }
-    const score = input.mv ? input.mv.score : 0;
+    const score = input.mv ? input.mv.loveOverflows : 0;
     const card = drawResultCard(this.ctx, w, h, win, score, input.peakLoveShare);
     const btn: CanvasButton = {
       label: win ? 'Again' : 'Try Again',
@@ -281,10 +277,6 @@ export class Renderer {
     this.register('again', btn);
   }
 
-  // The world layer: constellation history, centroid trail, edges, nodes,
-  // target/selection rings, and the bond beam — all under the camera offset so
-  // the live cluster stays centred. The P1 pointer ring is drawn afterward in
-  // design space (it tracks the actual mouse, not the world).
   private renderWorld(input: RenderInput): void {
     if (!input.mv) return;
     const { ctx } = this;
@@ -294,15 +286,16 @@ export class Renderer {
     if (input.cameraOffset) ctx.translate(input.cameraOffset.x, input.cameraOffset.y);
 
     this.drawConstellation(mv);
-    drawTrail(ctx, input.centroidTrail, palette.locked, 0.22, 0, 1.5);
+    drawTrail(ctx, input.centroidTrail, palette.locked, 0.18, 0, 1.5);
 
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const node of mv.graph.values()) {
+      if (node.dying) continue;
       for (const nid of node.neighbors) {
-        if (nid <= node.id) continue; // draw each undirected edge once
+        if (nid <= node.id) continue; // each undirected edge once
         const nb = mv.graph.get(nid);
-        if (!nb) continue;
+        if (!nb || nb.dying) continue;
         drawEdge(ctx, node.x, node.y, nb.x, nb.y, (node.love + nb.love) / 2, input.time);
       }
     }
@@ -310,7 +303,6 @@ export class Renderer {
 
     for (const node of mv.graph.values()) drawNode(ctx, node, input.simTime);
 
-    // Onboarding spotlight on the universe the coach is pointing at.
     if (input.coach && input.coach.targetId !== null) {
       const cn = mv.graph.get(input.coach.targetId);
       if (cn) drawCoachHighlight(ctx, cn.x, cn.y, input.time);
@@ -318,7 +310,6 @@ export class Renderer {
 
     const pTarget = input.pointer.targetId !== null ? mv.graph.get(input.pointer.targetId) : undefined;
     if (pTarget) drawTargetRing(ctx, pTarget.x, pTarget.y, palette.player1);
-    // P2's ring only appears once a second player has actually pressed a key.
     const kSel =
       input.p2Active && input.keyCursor.selectedId !== null
         ? mv.graph.get(input.keyCursor.selectedId)
@@ -328,14 +319,8 @@ export class Renderer {
       drawCursorLabel(ctx, kSel.x, kSel.y + 4, 'P2', palette.player2);
     }
 
-    if (input.bothHolding && pTarget && kSel && pTarget.id !== kSel.id) {
-      drawBondBeam(ctx, pTarget.x, pTarget.y, kSel.x, kSel.y, input.bondCharge);
-    }
-
     ctx.restore();
 
-    // While holding, a love beam from the cursor to the universe being filled;
-    // the links themselves appear live as edges as you sweep.
     if (input.pointer.pos && input.pointer.held && pTarget && input.cameraOffset) {
       drawLoveBeam(
         ctx,

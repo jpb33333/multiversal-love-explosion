@@ -1,25 +1,19 @@
 // The multiverse graph: universe nodes connected by undirected edges. Pure data
-// + a tiny store; all the dynamics live in contagion.ts / spawn.ts / lockin.ts.
-//
-// The node type is `MvNode`, not `Node`, on purpose — the DOM lib defines a
-// global `Node`, and shadowing it invites confusing bugs.
-
-export type NodeState = 'potential' | 'loving' | 'unloving' | 'locked';
+// plus a tiny store; the dynamics live in dynamics.ts / spawn.ts / Multiverse.ts.
+// The node type is `MvNode`, not `Node`, to avoid shadowing the DOM global.
 
 export interface MvNode {
   id: number;
   x: number;
   y: number;
-  state: NodeState;
-  love: number; // 0..1 order parameter (0 = entropy, 1 = love, 0.5 = undecided)
-  loveNext: number; // double-buffer scratch for the synchronous contagion update
-  nudge: number; // love/s a player is pouring in THIS tick (consumed by contagion)
+  love: number; // 0..1 — 0 = entropy, 1 = love, 0.5 = neutral
+  loveNext: number; // double-buffer scratch for the synchronous update
+  pour: number; // love/s a player is pouring in THIS tick (consumed by dynamics)
   age: number; // seconds since spawn
-  commitTimer: number; // seconds a commit threshold has held (while potential)
-  lovingTimer: number; // seconds continuously loving (for lock-in stability)
-  strandedTimer: number; // seconds unloving with no living neighbor (for culling)
-  lockedAt: number; // sim time when locked, else -1 (drives fade → cull)
-  neighbors: number[]; // ids of edge-connected neighbors (undirected, deduped)
+  dying: boolean; // overflowed — now bursting and fading out
+  dieT: number; // 0..1 fade progress once dying (1 ⇒ cull)
+  burstLove: boolean; // true if it overflowed into JOY, false into DARKNESS (fade colour)
+  neighbors: number[]; // ids of edge-connected neighbours (undirected, deduped)
 }
 
 export function makeNode(id: number, x: number, y: number, love: number): MvNode {
@@ -27,15 +21,13 @@ export function makeNode(id: number, x: number, y: number, love: number): MvNode
     id,
     x,
     y,
-    state: 'potential',
     love,
     loveNext: love,
-    nudge: 0,
+    pour: 0,
     age: 0,
-    commitTimer: 0,
-    lovingTimer: 0,
-    strandedTimer: 0,
-    lockedAt: -1,
+    dying: false,
+    dieT: 0,
+    burstLove: false,
     neighbors: [],
   };
 }
@@ -63,8 +55,7 @@ export class GraphStore {
     return this.map.values();
   }
 
-  // Add an undirected edge. No-op for self-loops, missing nodes, or duplicates,
-  // so the neighbor lists never carry a stale or doubled id.
+  // Add an undirected edge. No-op for self-loops, missing nodes, or duplicates.
   addEdge(a: number, b: number): void {
     if (a === b) return;
     const na = this.map.get(a);
@@ -74,8 +65,8 @@ export class GraphStore {
     if (!nb.neighbors.includes(a)) nb.neighbors.push(a);
   }
 
-  // Remove a node AND scrub its id from every neighbor's list — there are never
-  // dangling edges after a cull (asserted in tests).
+  // Remove a node and scrub its id from every neighbour's list — no dangling
+  // edges after a cull (asserted in tests).
   remove(id: number): void {
     const node = this.map.get(id);
     if (!node) return;

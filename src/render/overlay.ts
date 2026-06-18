@@ -1,9 +1,9 @@
 import { palette, rgba, fonts, cpx, lineHeightFor } from '../theme.ts';
 import { clamp } from '../utils/clamp.ts';
 
-// HUD + screen furniture, all in design space: buttons, the wordmark, the
-// love-vs-entropy meter, the score, the result cards, and the how-to panel. The
-// CanvasButton/drawButton pattern follows BW (the Game owns hit-testing).
+// HUD + screen furniture, all in design space: buttons, the wordmark, the two
+// overflow tracks (love-bursts vs entropy-outbreaks, like Pandemic's cure and
+// outbreak tracks), the how-to and result cards, and the coach banner.
 
 export interface CanvasButton {
   label: string;
@@ -13,7 +13,6 @@ export interface CanvasButton {
   height: number;
 }
 
-// roundRect by hand — no dependency on the (sometimes-missing) ctx.roundRect.
 function roundRectPath(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -79,66 +78,66 @@ export function drawTitleStats(
   ctx.textAlign = 'center';
   ctx.fillStyle = rgba(palette.mist, 0.6);
   ctx.font = `400 ${cpx(13)}px ${fonts.sans}`;
-  const scoreTxt = best.bestScore !== null ? `best ${Math.round(best.bestScore)}` : 'no wins yet';
+  const scoreTxt = best.bestScore !== null ? `best ${Math.round(best.bestScore)} bursts` : 'no wins yet';
   ctx.fillText(`${best.wins}/${best.total} won  ·  ${scoreTxt}`, w / 2, h * 0.86);
   ctx.restore();
 }
 
-// Top love-vs-entropy meter. The fill is love's share; a tick marks the win
-// threshold so players can see how close the explosion is.
-export function drawMeter(
+function trackBar(
   ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
   w: number,
-  loveShare: number,
-  winThreshold: number,
+  h: number,
+  frac: number,
+  color: string,
 ): void {
-  const bw = Math.min(560, w * 0.62);
-  const x = (w - bw) / 2;
-  const y = 24;
-  const bh = 14;
-
-  ctx.save();
-  roundRectPath(ctx, x, y, bw, bh, 7);
-  ctx.fillStyle = rgba(palette.entropy, 0.32);
+  roundRectPath(ctx, x, y, w, h, h / 2);
+  ctx.fillStyle = rgba(color, 0.18);
   ctx.fill();
-
   ctx.save();
-  roundRectPath(ctx, x, y, bw, bh, 7);
+  roundRectPath(ctx, x, y, w, h, h / 2);
   ctx.clip();
-  ctx.fillStyle = rgba(palette.love, 0.85);
-  ctx.fillRect(x, y, bw * clamp(loveShare, 0, 1), bh);
-  ctx.restore();
-
-  // win-threshold tick
-  const tx = x + bw * clamp(winThreshold, 0, 1);
-  ctx.strokeStyle = rgba(palette.loveBright, 0.9);
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(tx, y - 3);
-  ctx.lineTo(tx, y + bh + 3);
-  ctx.stroke();
-
-  ctx.font = `600 ${cpx(12)}px ${fonts.sans}`;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
-  ctx.fillStyle = rgba(palette.love, 0.9);
-  ctx.fillText('LOVE', x, y + bh + cpx(13));
-  ctx.textAlign = 'right';
-  ctx.fillStyle = rgba(palette.mist, 0.9);
-  ctx.fillText('ENTROPY', x + bw, y + bh + cpx(13));
-  ctx.textAlign = 'center';
-  ctx.fillStyle = palette.pearl;
-  ctx.fillText(`${Math.round(loveShare * 100)}%`, x + bw / 2, y + bh / 2);
+  ctx.fillStyle = rgba(color, 0.9);
+  ctx.fillRect(x, y, w * clamp(frac, 0, 1), h);
   ctx.restore();
 }
 
-export function drawScore(ctx: CanvasRenderingContext2D, w: number, score: number): void {
+// The two race tracks: love-bursts climbing toward the win, entropy-outbreaks
+// climbing toward the loss.
+export function drawOverflowTracks(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  love: number,
+  winTarget: number,
+  entropy: number,
+  loseTarget: number,
+): void {
+  const bw = Math.min(420, w * 0.5);
+  const x = (w - bw) / 2;
+  const bh = 11;
+
   ctx.save();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = rgba(palette.pearl, 0.85);
-  ctx.font = `600 ${cpx(15)}px ${fonts.sans}`;
-  ctx.fillText(`${Math.round(score)}`, w / 2, 60);
+  ctx.textBaseline = 'middle';
+  ctx.font = `600 ${cpx(11)}px ${fonts.sans}`;
+
+  const yLove = 22;
+  trackBar(ctx, x, yLove, bw, bh, love / winTarget, palette.love);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = rgba(palette.love, 0.95);
+  ctx.fillText('LOVE BURSTS', x, yLove - 9);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = palette.pearl;
+  ctx.fillText(`${love} / ${winTarget}`, x + bw, yLove - 9);
+
+  const yEnt = 46;
+  trackBar(ctx, x, yEnt, bw, bh, entropy / loseTarget, palette.entropy);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = rgba(palette.entropy, 0.95);
+  ctx.fillText('ENTROPY OUTBREAKS', x, yEnt + bh + 9);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = palette.pearl;
+  ctx.fillText(`${entropy} / ${loseTarget}`, x + bw, yEnt + bh + 9);
   ctx.restore();
 }
 
@@ -190,7 +189,7 @@ export function drawResultCard(
   ctx.fillStyle = palette.pearl;
   ctx.font = `600 ${cpx(20)}px ${fonts.sans}`;
   ctx.fillText(
-    `score ${Math.round(score)}    ·    peak love ${Math.round(peakShare * 100)}%`,
+    `${Math.round(score)} love-bursts    ·    reached ${Math.round(peakShare * 100)}%`,
     w / 2,
     y + cpx(78) + lh + cpx(44),
   );
@@ -219,14 +218,14 @@ export function drawHowtoCard(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.fillText('How to play', w / 2, y + cpx(46));
 
   const lines = [
-    'HOLD the mouse and SWEEP across universes: each one you pass fills with',
-    'love and links into a glowing strand. (Hold still on one to just love it.)',
-    'Grow a web of loving universes; a settled cluster LOCKS IN, banking love.',
-    'Win when the LOVE meter passes the ↑ mark; lose if entropy takes over.',
+    'HOLD the mouse on a universe to pour in love.',
+    'Every universe slowly cools toward ENTROPY. When one bottoms out it OVERFLOWS —',
+    'bursting darkness onto its neighbours, which can chain into an outbreak.',
+    'Fill a universe all the way with love and it overflows the OTHER way: a burst of',
+    'JOY that splashes love to its neighbours.',
     '',
-    'TWO PLAYERS, one laptop: mouse = Player 1, keyboard = Player 2.',
-    'P2: hold SPACE and move with arrows / WASD to love + link as you go.',
-    'You each build the same web at once.',
+    'Rack up enough LOVE-BURSTS to win; too many ENTROPY-OUTBREAKS and it collapses.',
+    'Two players: mouse = P1, keyboard = P2 (arrows / WASD move, SPACE pours).',
   ];
   ctx.fillStyle = rgba(palette.pearl, 0.82);
   ctx.font = `400 ${cpx(15)}px ${fonts.sans}`;
@@ -239,7 +238,6 @@ export function drawHowtoCard(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.restore();
 }
 
-// A faint one-line control reminder at the bottom of the playing screen.
 export function drawPlayingHelp(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   ctx.save();
   ctx.textAlign = 'center';
@@ -247,14 +245,13 @@ export function drawPlayingHelp(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.fillStyle = rgba(palette.mist, 0.4);
   ctx.font = `400 ${cpx(12)}px ${fonts.sans}`;
   ctx.fillText(
-    'Hold the mouse and SWEEP across universes to love + connect   ·   P2: hold SPACE + arrows   ·   M mutes',
+    'Hold a universe to pour in love   ·   Player 2 (optional): arrows + space   ·   M mutes',
     w / 2,
     h - 16,
   );
   ctx.restore();
 }
 
-// A pill banner just under the meter carrying the current onboarding hint.
 export function drawCoachBanner(ctx: CanvasRenderingContext2D, w: number, text: string): void {
   ctx.save();
   ctx.font = `600 ${cpx(17)}px ${fonts.sans}`;
@@ -263,7 +260,7 @@ export function drawCoachBanner(ctx: CanvasRenderingContext2D, w: number, text: 
   const bw = ctx.measureText(text).width + 36;
   const bh = cpx(17) + 18;
   const x = (w - bw) / 2;
-  const y = 80;
+  const y = 76;
   roundRectPath(ctx, x, y, bw, bh, bh / 2);
   ctx.fillStyle = rgba(palette.voidDeep, 0.72);
   ctx.fill();

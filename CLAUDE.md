@@ -13,8 +13,8 @@ Project rules for working on this codebase with Claude Code.
 5. **Test before you fix.** Write a failing test that reproduces the bug, then fix.
 6. **Read your own diff.** Before calling work done: it builds, tests pass, it matches the plan, edge cases handled.
 7. **No unwired functions. No stubs. No placeholders.** Every function is called; every UI element is connected to working logic; no `// TODO`s left behind.
-8. **The simulation is the floor, not the ceiling.** The contagion/lock-in/outcome math is not a place for vibes. Tests assert the invariants (love bounded to [0,1], determinism, bounded live-node count, classifier thresholds). Run `npm test` before every commit.
-9. **Game feel beats math purity.** Once the rules are correct, the constants (spawn rate, entropy ramp, lock thresholds, win/lose shares) get tuned by *playing the game*, not by deriving them. `npm run dev`, play through, adjust, repeat.
+8. **The simulation is the floor, not the ceiling.** The dynamics/overflow/outcome math is not a place for vibes. Tests assert the invariants (love bounded to [0,1], determinism, bounded live-node count, overflow + classifier thresholds). Run `npm test` before every commit.
+9. **Game feel beats math purity.** Once the rules are correct, the constants (entropy ramp, overflow splash, win/lose targets, pour rate) get tuned by *playing the game*, not by deriving them. `npm run dev`, play through, adjust, repeat.
 
 ## Don'ts
 
@@ -26,7 +26,7 @@ Project rules for working on this codebase with Claude Code.
 
 ## Architecture (one-paragraph mental model)
 
-`src/main.ts` boots a `Game` (`src/game/Game.ts`) which owns the state machine (`src/game/states.ts`), a `Renderer` (`src/render/Renderer.ts`), and a `Multiverse` (`src/sim/Multiverse.ts`). The Game drives `requestAnimationFrame`; each frame it advances the `Multiverse` from a fixed-step accumulator (spawn → contagion → cull, one `SIM.DT` tick at a time so behavior is frame-rate-independent and deterministic), asks `src/game/outcomes.ts` to classify the frame (playing / love_explosion / entropy_collapse), and asks the `Renderer` to paint. The game renders into a fixed design space (1280×800 landscape or 800×1280 portrait, picked by `layoutForViewport`) mapped to the viewport by a uniform contain-fit (`computeFit`), letterboxed and DPR-sharp; `Renderer.screenToLogical` inverts that fit so pointer hit-tests line up, and a camera offset keeps the live cluster centered as the multiverse scrolls. The two input controls (`src/input/PointerCursor.ts` for P1, `src/input/KeyCursor.ts` for P2) are **passive mutators** — the Game owns all pointer/keyboard wiring and polls their getters; the controls emit no events.
+`src/main.ts` boots a `Game` (`src/game/Game.ts`) which owns the state machine (`src/game/states.ts`), a `Renderer` (`src/render/Renderer.ts`), and a `Multiverse` (`src/sim/Multiverse.ts`). The Game drives `requestAnimationFrame`; each frame it advances the `Multiverse` from a fixed-step accumulator (spawn → dynamics → overflow → fade, one `SIM.DT` tick at a time so behavior is frame-rate-independent and deterministic), asks `src/game/outcomes.ts` to classify the frame (playing / love_explosion / entropy_collapse), and asks the `Renderer` to paint. The game renders into a fixed design space (1280×800 landscape or 800×1280 portrait, picked by `layoutForViewport`) mapped to the viewport by a uniform contain-fit (`computeFit`), letterboxed and DPR-sharp; `Renderer.screenToLogical` inverts that fit so pointer hit-tests line up, and a camera offset keeps the live cluster centered as the multiverse scrolls. The two input controls (`src/input/PointerCursor.ts` for P1, `src/input/KeyCursor.ts` for P2) are **passive mutators** — the Game owns all pointer/keyboard wiring and polls their getters; the controls emit no events.
 
 ### The pure/render boundary
 
@@ -34,15 +34,15 @@ Everything under `src/sim/` is pure logic with **zero imports from `render/` or 
 
 ### Rendering: three transform regimes (mirrors BW)
 
-`Renderer.render()` paints in a strict layered order across three coordinate regimes: (1) **identity** — the deep-void fill; (2) **DPR-only screen space** — the full-bleed starfield backdrop (covers letterbox margins too); (3) **scene transform** (`dpr × fit.scale` + centering, then the camera offset) — the constellation history, edges, nodes, particles, and cursors in design-space px. The HUD/overlay (wordmark, love-vs-entropy meter, result cards) draws back in screen space so it ignores the camera.
+`Renderer.render()` paints in a strict layered order across three coordinate regimes: (1) **identity** — the deep-void fill; (2) **DPR-only screen space** — the full-bleed starfield backdrop (covers letterbox margins too); (3) **scene transform** (`dpr × fit.scale` + centering, then the camera offset) — the constellation history, edges, nodes, particles, and cursors in design-space px. The HUD/overlay (wordmark, the two overflow tracks, result cards) draws back in screen space so it ignores the camera.
 
 ## House style
 
 - TypeScript with the strictness flags in `tsconfig.json` (`noUnusedLocals`, `noUnusedParameters`, `erasableSyntaxOnly`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`). No `any` unless explained in a one-line comment. `erasableSyntaxOnly` means **no `enum`s, no namespaces, no parameter properties** — use string-literal unions and `as const` tables. Imports use `.ts` extensions; type-only imports use `import type`.
-- Module per concept, named for what it does (`contagion.ts`, not `sim-utils.ts`).
+- Module per concept, named for what it does (`dynamics.ts`, not `sim-utils.ts`).
 - No frameworks, no UI libraries — vanilla DOM events on a single `<canvas id="stage">`.
 - **All colors come from `src/theme.ts`.** Never hard-code a hex elsewhere. (The one exception is `style.css`, which duplicates `voidDeep`/`pearl` because CSS can't read the TS tokens — keep them in sync by hand.)
-- **No scattered magic numbers — add to the right table:** simulation constants in `src/sim/constants.ts` (`SIM`, `CONTAGION`, `ENTROPY`, `SPAWN`, `LOCK`, `BOND`); win/lose thresholds in `src/game/outcomes.ts` (`DEFAULT_OUTCOME_CONFIG`); UI limits in `src/game/states.ts` (`LIMITS`).
+- **No scattered magic numbers — add to the right table:** simulation constants in `src/sim/constants.ts` (`SIM`, `FIELD`, `ENTROPY`, `SPAWN`, `OVERFLOW`, `OUTCOME`); win/lose targets in `src/game/outcomes.ts` (`DEFAULT_OUTCOME_CONFIG`); UI limits in `src/game/states.ts` (`LIMITS`).
 
 ## Workflow
 

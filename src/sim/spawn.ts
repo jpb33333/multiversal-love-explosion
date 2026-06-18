@@ -1,12 +1,8 @@
-// Frontier spawning. New universes appear adjacent to the CURRENT live cluster
-// (near a random existing node), not at an ever-distant global radius — so they
-// always bloom near the action while the whole cluster drifts through unbounded
-// space as the interior is culled behind it. Edges are wired to the k nearest
-// live neighbors within a distance cap (bounded degree → stable, cheap).
-//
-// Pure: operates on the Multiverse's public surface (rng, graph, allocId,
-// loveSpawnCredits). The `import type` of Multiverse is erased at runtime, so
-// there is no import cycle with Multiverse.ts.
+// Spawning. The multiverse keeps growing: a seed cluster at t=0, then new
+// universes appear next to the live web at an accelerating rate. Edges wire to
+// the nearest live neighbours within a cap (a real Pandemic-style map). Players
+// never build edges — the network is given. Pure: operates on the Multiverse's
+// public surface; the `import type` is erased, so there is no import cycle.
 
 import type { Multiverse } from './Multiverse.ts';
 import { makeNode, type MvNode } from './graph.ts';
@@ -29,7 +25,7 @@ function wireEdges(mv: Multiverse, node: MvNode): void {
   const maxSq = SPAWN.EDGE_MAX_DIST * SPAWN.EDGE_MAX_DIST;
   const cands: { id: number; d: number }[] = [];
   for (const n of mv.graph.values()) {
-    if (n.id === node.id) continue;
+    if (n.id === node.id || n.dying) continue;
     const dx = n.x - node.x;
     const dy = n.y - node.y;
     const d = dx * dx + dy * dy;
@@ -40,21 +36,22 @@ function wireEdges(mv: Multiverse, node: MvNode): void {
   for (let i = 0; i < k; i++) mv.graph.addEdge(node.id, cands[i].id);
 }
 
-// Initial central disc, so the very first loving cluster has somewhere to grow.
+function freshLove(mv: Multiverse): number {
+  return clamp(0.5 + (mv.rng() - 0.5) * 2 * SPAWN.LOVE_JITTER, 0, 1);
+}
+
+// Initial central disc so there's a web to act on immediately.
 export function seedCluster(mv: Multiverse): void {
   for (let i = 0; i < SPAWN.SEED_COUNT; i++) {
     const ang = mv.rng() * TWO_PI;
     const r = Math.sqrt(mv.rng()) * SPAWN.SEED_RADIUS; // sqrt → uniform over the disc
-    const love = 0.5 + (mv.rng() - 0.5) * 2 * SPAWN.LOVE_JITTER;
-    const node = makeNode(mv.allocId(), Math.cos(ang) * r, Math.sin(ang) * r, clamp(love, 0, 1));
+    const node = makeNode(mv.allocId(), Math.cos(ang) * r, Math.sin(ang) * r, freshLove(mv));
     mv.graph.add(node);
     wireEdges(mv, node);
   }
 }
 
-// One frontier spawn. Picks a random live node as anchor, finds an open spot a
-// short hop away, and wires it in. Skips silently if the area is too crowded
-// (keeps clusters from overlapping into mush).
+// One new universe next to the live web; skips silently if the area is crowded.
 export function spawnOne(mv: Multiverse): void {
   const count = mv.graph.size;
   if (count === 0) {
@@ -89,14 +86,7 @@ export function spawnOne(mv: Multiverse): void {
   }
   if (!placed) return;
 
-  let love: number;
-  if (mv.loveSpawnCredits >= 1) {
-    mv.loveSpawnCredits -= 1;
-    love = SPAWN.LOVE_SEEDED;
-  } else {
-    love = 0.5 + (mv.rng() - 0.5) * 2 * SPAWN.LOVE_JITTER;
-  }
-  const node = makeNode(mv.allocId(), px, py, clamp(love, 0, 1));
+  const node = makeNode(mv.allocId(), px, py, freshLove(mv));
   mv.graph.add(node);
   wireEdges(mv, node);
 }

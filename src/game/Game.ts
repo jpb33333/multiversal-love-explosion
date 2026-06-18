@@ -1,36 +1,34 @@
 // The Game owns the requestAnimationFrame loop, the fixed-step accumulator, the
-// state machine, and all input wiring (mirrors BW's Game). Each frame: poll the
-// passive cursors, advance the Multiverse in fixed SIM.DT ticks (so behavior is
-// frame-rate-independent), classify win/lose, and hand the Renderer a read-only
-// snapshot. Player nurture + the bond are applied INSIDE the fixed step so a
-// given seed + input is deterministic.
+// state machine, and all input wiring. Each frame: poll the passive cursors,
+// advance the Multiverse in fixed SIM.DT ticks, react to overflow bursts, and
+// hand the Renderer a read-only snapshot. The only verb is "pour love" — hold
+// the mouse (P1) or Space on the selected universe (P2). Overflows do the rest.
 
 import { Renderer, type RenderInput } from '../render/Renderer.ts';
 import { AudioEngine } from '../render/audio.ts';
 import { Multiverse } from '../sim/Multiverse.ts';
 import { SIM } from '../sim/constants.ts';
-import { LoveOutcomeClassifier } from './outcomes.ts';
-import { BondController } from './bond.ts';
+import { LoveOutcomeClassifier, type OutcomeKind } from './outcomes.ts';
 import { LIMITS, type GameStateKind } from './states.ts';
 import { Trail } from '../render/trail.ts';
 import { PointerCursor } from '../input/PointerCursor.ts';
 import { KeyCursor } from '../input/KeyCursor.ts';
-import { recordGame, summarize, type StatsSummary, type OutcomeKind } from './stats.ts';
+import { recordGame, summarize, type StatsSummary } from './stats.ts';
 import { palette } from '../theme.ts';
 
-const DT_CAP = 1 / 30; // clamp a long frame (tab unfocus) so the sim never lurches
-const ACCUM_CAP = 0.25; // drop backlog beyond this so we never spiral after a pause
-const TRAIL_CAP = 220;
+const DT_CAP = 1 / 30; // clamp a long frame (tab unfocus)
+const ACCUM_CAP = 0.25; // drop backlog beyond this so we never spiral
+const TRAIL_CAP = 200;
 
 export class Game {
   private readonly renderer: Renderer;
   private state: GameStateKind = 'title';
   private mv: Multiverse | null = null;
   private readonly classifier = new LoveOutcomeClassifier();
-  private readonly bond = new BondController();
   private readonly pointer = new PointerCursor();
   private readonly keyCursor = new KeyCursor();
   private readonly centroidTrail = new Trail(TRAIL_CAP);
+  private readonly audio = new AudioEngine();
   private cameraOffset: { x: number; y: number } | null = null;
   private p1Target: number | null = null;
   private stats: StatsSummary;
@@ -39,17 +37,14 @@ export class Game {
   private lastFrame = 0;
   private elapsed = 0; // wall seconds since boot
   private simAccum = 0;
-  private readonly audio = new AudioEngine();
-  private nurtureSfxT = 0; // throttles the nurture tick/spark
-  private winCascadeT = 0; // remaining seconds of the win cascade
-  private winCascadeAcc = 0; // spacing between cascade bursts
-  private coaching = false; // show onboarding hints (only until the first win)
-  private coachStep = 0; // 0 love-a-node · 1 grow · 2 done/fading
+  private nurtureSfxT = 0;
+  private winCascadeT = 0;
+  private winCascadeAcc = 0;
+  private coaching = false; // onboarding, only until the first win
+  private coachStep = 0;
   private coachFadeT = 0;
   private hasPouredLove = false;
-  private firstLockSeen = false;
-  private hasConnected = false;
-  private dragFromId: number | null = null; // current node of the P1 love-stroke
+  private firstLoveBurst = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -63,7 +58,7 @@ export class Game {
     requestAnimationFrame(this.tick);
   }
 
-  // ── input wiring (the Game owns every listener; controls stay passive) ──
+  // ── input wiring ──
 
   private attachInput(canvas: HTMLCanvasElement): void {
     canvas.addEventListener('pointermove', e => {
@@ -73,18 +68,14 @@ export class Game {
       'pointerdown',
       e => {
         e.preventDefault();
-        this.audio.resume(); // first user gesture unlocks Web Audio
+        this.audio.resume();
         const p = this.renderer.screenToLogical(e);
         this.pointer.setPos(p);
-        const consumedByButton = this.onClick(p);
-        if (!consumedByButton && this.state === 'playing') {
-          this.pointer.press();
-          this.dragFromId = this.computeP1Target(); // the universe a drag would start from
-        }
+        if (!this.onClick(p) && this.state === 'playing') this.pointer.press();
       },
       { passive: false },
     );
-    window.addEventListener('pointerup', () => this.onPointerUp());
+    window.addEventListener('pointerup', () => this.pointer.release());
     canvas.addEventListener('pointerleave', () => {
       this.pointer.setPos(null);
       this.pointer.release();
@@ -96,7 +87,6 @@ export class Game {
     );
   }
 
-  // Route a click to whatever button is under it. Returns true if consumed.
   private onClick(p: { x: number; y: number }): boolean {
     const btn = this.renderer.hoveredButton(p);
     if (!btn) return false;
@@ -117,7 +107,7 @@ export class Game {
   }
 
   private onKeyDown(e: KeyboardEvent): void {
-    this.audio.resume(); // first user gesture unlocks Web Audio
+    this.audio.resume();
     if (e.code === 'KeyM') {
       this.audio.toggleMute();
       return;
@@ -140,9 +130,7 @@ export class Game {
       }
       return;
     }
-    if (this.state === 'playing') {
-      if (this.keyCursor.onKeyDown(e.code)) e.preventDefault();
-    }
+    if (this.state === 'playing' && this.keyCursor.onKeyDown(e.code)) e.preventDefault();
   }
 
   // ── state transitions ──
@@ -162,20 +150,17 @@ export class Game {
     const seed = (SIM.SEED ^ Math.floor(performance.now() * 1000)) >>> 0;
     this.mv = Multiverse.create(seed);
     this.classifier.reset();
-    this.bond.reset();
     this.keyCursor.reset();
     this.centroidTrail.reset();
     this.cameraOffset = null;
     this.p1Target = null;
     this.simAccum = 0;
     this.pointer.release();
-    this.coaching = this.stats.wins === 0; // teach newcomers, leave veterans alone
+    this.coaching = this.stats.wins === 0;
     this.coachStep = 0;
     this.coachFadeT = 0;
     this.hasPouredLove = false;
-    this.firstLockSeen = false;
-    this.hasConnected = false;
-    this.dragFromId = null;
+    this.firstLoveBurst = false;
     this.state = 'playing';
   }
 
@@ -185,7 +170,7 @@ export class Game {
     this.state = win ? 'won' : 'lost';
     recordGame({
       outcome: kind,
-      score: Math.round(this.mv.score),
+      score: this.mv.loveOverflows,
       peakLoveShare: this.classifier.peakLoveShare,
       duration: this.mv.time,
       ts: Date.now(),
@@ -220,7 +205,6 @@ export class Game {
   };
 
   private update(dt: number): void {
-    // The sim advances while playing and during the win cascade; a loss freezes.
     if ((this.state === 'playing' || this.state === 'won') && this.mv) {
       const c = this.mv.centroid();
       if (c) {
@@ -229,30 +213,24 @@ export class Game {
         if (this.cameraOffset === null) {
           this.cameraOffset = { x: tx, y: ty };
         } else {
-          // Ease toward the target (~0.4s) so the view glides, never lurches.
-          const k = 1 - Math.exp(-dt / 0.4);
+          const k = 1 - Math.exp(-dt / 0.4); // ease, so the view glides
           this.cameraOffset.x += (tx - this.cameraOffset.x) * k;
           this.cameraOffset.y += (ty - this.cameraOffset.y) * k;
         }
       }
       this.p1Target = this.computeP1Target();
-      if (this.state === 'playing') {
-        this.keyCursor.step(this.mv, dt);
-        const link = this.keyCursor.consumeLink(); // P2 finished a keyboard connect
-        if (link && this.mv.connect(link.from, link.to)) this.hasConnected = true;
-      }
+      if (this.state === 'playing') this.keyCursor.step(this.mv, dt);
 
       this.advanceSim(dt);
 
       if (c) this.centroidTrail.push(c.x, c.y);
-      this.drainLockEvents();
-      this.drainConnectEvents();
-      this.audio.setLove(this.mv.tally().loveShare);
+      this.drainOverflowEvents();
+      this.audio.setLove(this.mv.tally().avgLove);
 
       if (this.state === 'playing') {
         this.nurtureFeedback(dt);
         this.updateCoach(dt);
-        const outcome = this.classifier.update(this.mv, dt);
+        const outcome = this.classifier.update(this.mv);
         if (outcome.kind !== 'playing') this.resolve(outcome.kind);
       } else if (this.state === 'won') {
         this.winCascade(dt);
@@ -262,7 +240,58 @@ export class Game {
     }
   }
 
-  // A throttled tick + spark at the universe a player is actively loving.
+  private advanceSim(dt: number): void {
+    if (!this.mv) return;
+    this.simAccum += dt;
+    if (this.simAccum > ACCUM_CAP) this.simAccum = ACCUM_CAP;
+    while (this.simAccum >= SIM.DT) {
+      this.applyPour();
+      this.mv.tick(SIM.DT);
+      this.simAccum -= SIM.DT;
+    }
+  }
+
+  // Pour love into whatever each player is holding — the whole verb.
+  private applyPour(): void {
+    if (!this.mv) return;
+    if (this.pointer.held && this.p1Target !== null) {
+      this.mv.nurture(this.p1Target);
+      this.hasPouredLove = true;
+    }
+    const p2 = this.keyCursor.selectedId;
+    if (this.keyCursor.nurturing && p2 !== null) {
+      this.mv.nurture(p2);
+      this.hasPouredLove = true;
+    }
+  }
+
+  private computeP1Target(): number | null {
+    if (!this.mv || !this.pointer.pos) return null;
+    if (this.renderer.hoveredButton(this.pointer.pos)) return null;
+    const off = this.cameraOffset ?? { x: 0, y: 0 };
+    return this.mv.nearestNode(
+      { x: this.pointer.pos.x - off.x, y: this.pointer.pos.y - off.y },
+      LIMITS.pointerReach,
+    );
+  }
+
+  // Every overflow becomes a burst + sound: warm joy or a cold outbreak.
+  private drainOverflowEvents(): void {
+    if (!this.mv) return;
+    const off = this.cameraOffset ?? { x: 0, y: 0 };
+    for (const ev of this.mv.overflowEvents) {
+      if (ev.love) {
+        this.audio.loveBurst();
+        this.renderer.burst(ev.x + off.x, ev.y + off.y, 28, palette.loveBright, 280);
+        this.firstLoveBurst = true;
+      } else {
+        this.audio.darkBurst();
+        this.renderer.burst(ev.x + off.x, ev.y + off.y, 22, palette.entropy, 240);
+      }
+    }
+    this.mv.overflowEvents.length = 0;
+  }
+
   private nurtureFeedback(dt: number): void {
     if (!this.mv) return;
     this.nurtureSfxT -= dt;
@@ -282,7 +311,6 @@ export class Game {
     this.nurtureSfxT = 0.13;
   }
 
-  // Staggered bursts rippling out from the centre after a Love Explosion.
   private winCascade(dt: number): void {
     if (this.winCascadeT <= 0) return;
     this.winCascadeT -= dt;
@@ -296,145 +324,40 @@ export class Game {
     this.winCascadeAcc = 0.08;
   }
 
-  // Onboarding progress: advance from "love a node" → "grow it" → fade out, all
-  // driven by what the player has actually done.
   private updateCoach(dt: number): void {
     if (!this.coaching) return;
     if (!this.hasPouredLove) {
       this.coachStep = 0;
-    } else if (!this.hasConnected) {
+    } else if (!this.firstLoveBurst) {
       this.coachStep = 1;
-    } else if (!this.firstLockSeen) {
-      this.coachStep = 2;
     } else {
-      if (this.coachStep < 3) {
-        this.coachStep = 3;
-        this.coachFadeT = 4;
+      if (this.coachStep < 2) {
+        this.coachStep = 2;
+        this.coachFadeT = 5;
       }
       this.coachFadeT -= dt;
     }
   }
 
-  // The current coach hint + the universe to spotlight (null when none).
   private coachInfo(): { text: string; targetId: number | null } | null {
     if (!this.coaching || !this.mv) return null;
     if (this.coachStep === 0) {
       const c = this.mv.centroid();
       return {
-        text: 'Move your mouse over a universe and HOLD to fill it with love',
+        text: 'Hold the mouse on a universe to pour in love',
         targetId: c ? this.mv.nearestNode(c, 1e9) : null,
       };
     }
     if (this.coachStep === 1) {
-      return { text: 'Keep holding and SWEEP to a neighbour — they link as you go', targetId: null };
+      return {
+        text: 'Fill one all the way and it BURSTS with joy — spreading to its neighbours',
+        targetId: null,
+      };
     }
-    if (this.coachStep === 2) {
-      return { text: 'Sweep across universes to grow a glowing web of love', targetId: null };
-    }
-    if (this.coachStep === 3 && this.coachFadeT > 0) {
-      return { text: 'A cluster locked in! Win when LOVE passes the ↑ mark', targetId: null };
+    if (this.coachStep === 2 && this.coachFadeT > 0) {
+      return { text: 'Now catch universes before they go dark and burst into entropy', targetId: null };
     }
     return null;
-  }
-
-  private advanceSim(dt: number): void {
-    if (!this.mv) return;
-    this.simAccum += dt;
-    if (this.simAccum > ACCUM_CAP) this.simAccum = ACCUM_CAP;
-    while (this.simAccum >= SIM.DT) {
-      this.applyCursorIntents();
-      this.mv.tick(SIM.DT);
-      this.simAccum -= SIM.DT;
-    }
-  }
-
-  // Applied inside the fixed step so input affects the sim deterministically.
-  private applyCursorIntents(): void {
-    if (!this.mv) return;
-    const p1 = this.p1Target;
-    const p2 = this.keyCursor.selectedId;
-    // P1 love-stroke: love the universe under the cursor and chain it to the
-    // previous one as you sweep — connecting is one fluid motion, no aiming.
-    if (this.pointer.held && p1 !== null) {
-      this.mv.nurture(p1);
-      this.hasPouredLove = true;
-      if (this.dragFromId === null) {
-        this.dragFromId = p1;
-      } else if (p1 !== this.dragFromId) {
-        if (this.mv.connect(this.dragFromId, p1)) this.hasConnected = true;
-        this.dragFromId = p1;
-      }
-    }
-    if (this.keyCursor.nurturing && p2 !== null) {
-      this.mv.nurture(p2);
-      this.hasPouredLove = true;
-    }
-    const bothHolding = this.pointer.held && this.keyCursor.nurturing;
-    const bondResult = this.bond.update(this.mv, SIM.DT, bothHolding, p1, p2);
-    if (bondResult === 'fired') {
-      this.audio.bond();
-      const off = this.cameraOffset ?? { x: 0, y: 0 };
-      this.renderer.burst(
-        this.bond.lastFireX + off.x,
-        this.bond.lastFireY + off.y,
-        Math.min(20 + this.bond.lastFireSize * 4, 80),
-        palette.loveBright,
-        280,
-      );
-    }
-  }
-
-  // The node under the P1 pointer (in world space), or null if the pointer is
-  // off, over a button, or not near any universe.
-  private computeP1Target(): number | null {
-    if (!this.mv || !this.pointer.pos) return null;
-    if (this.renderer.hoveredButton(this.pointer.pos)) return null;
-    const off = this.cameraOffset ?? { x: 0, y: 0 };
-    return this.mv.nearestNode(
-      { x: this.pointer.pos.x - off.x, y: this.pointer.pos.y - off.y },
-      LIMITS.pointerReach,
-    );
-  }
-
-  // Turn each lock-in into a love-spark burst at its on-screen position.
-  private drainLockEvents(): void {
-    if (!this.mv) return;
-    if (this.mv.lockEvents.length > 0) this.firstLockSeen = true;
-    const off = this.cameraOffset ?? { x: 0, y: 0 };
-    for (const ev of this.mv.lockEvents) {
-      this.audio.lock(ev.size);
-      this.renderer.burst(
-        ev.x + off.x,
-        ev.y + off.y,
-        Math.min(8 + ev.size * 3, 60),
-        palette.loveBright,
-        200,
-      );
-    }
-    this.mv.lockEvents.length = 0;
-  }
-
-  // Turn each player-drawn link into a spark + sound at its midpoint.
-  private drainConnectEvents(): void {
-    if (!this.mv) return;
-    const off = this.cameraOffset ?? { x: 0, y: 0 };
-    for (const ev of this.mv.connectEvents) {
-      this.audio.connect();
-      this.renderer.burst(
-        (ev.ax + ev.bx) / 2 + off.x,
-        (ev.ay + ev.by) / 2 + off.y,
-        10,
-        palette.loveBright,
-        160,
-      );
-    }
-    this.mv.connectEvents.length = 0;
-  }
-
-  // On release: if the drag ended on a different nearby universe, wire them.
-  private onPointerUp(): void {
-    this.dragFromId = null; // end the love-stroke
-    this.pointer.release();
   }
 
   private render(dt: number): void {
@@ -451,8 +374,6 @@ export class Game {
       centroidTrail: this.centroidTrail,
       pointer: { pos: this.pointer.pos, targetId: this.p1Target, held: this.pointer.held },
       keyCursor: { selectedId: this.keyCursor.selectedId },
-      bondCharge: this.bond.chargeProgress,
-      bothHolding: this.pointer.held && this.keyCursor.nurturing,
       p2Active: this.keyCursor.active,
       coach: this.coachInfo(),
       peakLoveShare: this.classifier.peakLoveShare,

@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-06-18
+
+### Changed
+
+- **Core redesign — overflow cascades, à la Pandemic.** The accreted mechanics
+  (player-built connections, lock-in clusters, the co-op bond, the
+  potential/loving/unloving state machine) are gone. The new core is one idea:
+  universes on a fixed network cool toward entropy and OVERFLOW at the extremes
+  — bursting darkness onto their neighbors (an outbreak that can chain), or,
+  when you fill them with love, bursting JOY that splashes love outward. One
+  verb: hold to pour love. Win on enough love-bursts; lose on too many
+  entropy-outbreaks (two race tracks at the top, like Pandemic's cure markers
+  vs the outbreak track).
+- Much smaller and clearer: the simulation is a fraction of its former size, the
+  HUD is two legible tracks, nodes read by color + a pulse warning of an
+  imminent overflow, and the bundle dropped to ~33 KB.
+- Added `docs/DESIGN.md`; README and CLAUDE.md rewritten to the new core.
+
 ## [0.6.0] — 2026-06-13
 
 ### Changed
