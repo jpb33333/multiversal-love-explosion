@@ -16,7 +16,6 @@ import {
   drawPointerCursor,
   drawSelectionRing,
   drawTargetRing,
-  drawLoveBeam,
   drawCoachHighlight,
   drawCursorLabel,
 } from './cursors.ts';
@@ -24,7 +23,7 @@ import {
   type CanvasButton,
   drawButton,
   drawWordmark,
-  drawOverflowTracks,
+  drawSpreadBar,
   drawResultCard,
   drawTitleStats,
   drawHowtoCard,
@@ -35,28 +34,24 @@ import type { Multiverse, Tally } from '../sim/Multiverse.ts';
 import { DEFAULT_OUTCOME_CONFIG } from '../game/outcomes.ts';
 import type { StatsSummary } from '../game/stats.ts';
 
-// Everything the Renderer needs for a frame. It only READS this — the Renderer
-// never mutates the simulation.
 export interface RenderInput {
   state: GameStateKind;
-  time: number; // wall-clock seconds since boot — starfield / cursor animation
-  simTime: number; // multiverse sim time — node burst-fade timing (0 when no sim)
+  time: number; // wall-clock seconds since boot
   dt: number;
   hover: { x: number; y: number } | null;
   mv: Multiverse | null;
   tally: Tally | null;
-  cameraOffset: { x: number; y: number } | null; // world → design-centre translation
+  cameraOffset: { x: number; y: number } | null;
   centroidTrail: Trail;
-  pointer: { pos: { x: number; y: number } | null; targetId: number | null; held: boolean };
+  pointer: { pos: { x: number; y: number } | null; targetId: number | null };
   keyCursor: { selectedId: number | null };
-  p2Active: boolean; // P2 has joined — only then is their cursor shown
-  coach: { text: string; targetId: number | null } | null; // onboarding hint
-  peakLoveShare: number; // 0..1 progress for the result card
+  p2Active: boolean;
+  coach: { text: string; targetId: number | null } | null;
+  peakLoveShare: number;
   stats: StatsSummary;
 }
 
 const TOUCH_TARGET_MIN_CSS = 44;
-const TAU = Math.PI * 2;
 
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
@@ -188,8 +183,6 @@ export class Renderer {
     this.nextButtons = front;
   }
 
-  // ── scenes ──
-
   private renderTitle(input: RenderInput): void {
     const w = this.layout.width;
     const h = this.layout.height;
@@ -224,13 +217,12 @@ export class Renderer {
   private renderPlaying(input: RenderInput): void {
     this.renderWorld(input);
     if (input.mv) {
-      drawOverflowTracks(
+      drawSpreadBar(
         this.ctx,
         this.layout.width,
-        input.mv.loveOverflows,
-        DEFAULT_OUTCOME_CONFIG.winLoveOverflows,
-        input.mv.entropyOverflows,
-        DEFAULT_OUTCOME_CONFIG.loseEntropyOverflows,
+        input.mv.litCount,
+        DEFAULT_OUTCOME_CONFIG.takeoffTarget,
+        input.mv.peakLit,
       );
     }
     if (input.coach) drawCoachBanner(this.ctx, this.layout.width, input.coach.text);
@@ -252,16 +244,9 @@ export class Renderer {
     }
 
     if (input.mv) {
-      drawOverflowTracks(
-        this.ctx,
-        w,
-        input.mv.loveOverflows,
-        DEFAULT_OUTCOME_CONFIG.winLoveOverflows,
-        input.mv.entropyOverflows,
-        DEFAULT_OUTCOME_CONFIG.loseEntropyOverflows,
-      );
+      drawSpreadBar(this.ctx, w, input.mv.litCount, DEFAULT_OUTCOME_CONFIG.takeoffTarget, input.mv.peakLit);
     }
-    const score = input.mv ? input.mv.loveOverflows : 0;
+    const score = input.mv ? input.mv.peakLit : 0;
     const card = drawResultCard(this.ctx, w, h, win, score, input.peakLoveShare);
     const btn: CanvasButton = {
       label: win ? 'Again' : 'Try Again',
@@ -285,23 +270,21 @@ export class Renderer {
     ctx.save();
     if (input.cameraOffset) ctx.translate(input.cameraOffset.x, input.cameraOffset.y);
 
-    this.drawConstellation(mv);
-    drawTrail(ctx, input.centroidTrail, palette.locked, 0.18, 0, 1.5);
+    drawTrail(ctx, input.centroidTrail, palette.locked, 0.16, 0, 1.5);
 
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const node of mv.graph.values()) {
-      if (node.dying) continue;
       for (const nid of node.neighbors) {
-        if (nid <= node.id) continue; // each undirected edge once
+        if (nid <= node.id) continue;
         const nb = mv.graph.get(nid);
-        if (!nb || nb.dying) continue;
-        drawEdge(ctx, node.x, node.y, nb.x, nb.y, (node.love + nb.love) / 2, input.time);
+        if (!nb) continue;
+        drawEdge(ctx, node.x, node.y, nb.x, nb.y, Math.max(node.signal, nb.signal), input.time);
       }
     }
     ctx.restore();
 
-    for (const node of mv.graph.values()) drawNode(ctx, node, input.simTime);
+    for (const node of mv.graph.values()) drawNode(ctx, node, input.time);
 
     if (input.coach && input.coach.targetId !== null) {
       const cn = mv.graph.get(input.coach.targetId);
@@ -321,32 +304,7 @@ export class Renderer {
 
     ctx.restore();
 
-    if (input.pointer.pos && input.pointer.held && pTarget && input.cameraOffset) {
-      drawLoveBeam(
-        ctx,
-        input.pointer.pos.x,
-        input.pointer.pos.y,
-        pTarget.x + input.cameraOffset.x,
-        pTarget.y + input.cameraOffset.y,
-        input.time,
-      );
-    }
-    if (input.pointer.pos) {
-      drawPointerCursor(ctx, input.pointer.pos.x, input.pointer.pos.y, input.pointer.held, input.time);
-    }
-  }
-
-  private drawConstellation(mv: Multiverse): void {
-    const { ctx } = this;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const c of mv.constellation) {
-      ctx.fillStyle = rgba(c.love ? palette.love : palette.entropy, c.love ? 0.14 : 0.1);
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, c.love ? 1.7 : 1.1, 0, TAU);
-      ctx.fill();
-    }
-    ctx.restore();
+    if (input.pointer.pos) drawPointerCursor(ctx, input.pointer.pos.x, input.pointer.pos.y, input.time);
   }
 
   private drawCornerControls(input: RenderInput): void {

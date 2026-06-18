@@ -1,29 +1,28 @@
 # Multiversal Love Explosion
 
-A 1–2 player co-op game about holding back entropy across a network of universes
-— and tipping it into joy. The core is borrowed from Pandemic's outbreak
-cascades.
+A 1–2 player co-op game about spreading love like a virus across a network of
+universes — and making it go viral before it burns out. A chain-reaction
+high-wire act in the spirit of Tetris: it only gets harder.
 
-The multiverse is a web of universes. Each one slowly cools toward **entropy**;
-when one bottoms out it **overflows**, bursting darkness onto its neighbors,
-which can chain into an outbreak. You and your partner pour **love** into
-universes to hold the line — and when you fill one all the way, it overflows the
-other way: a **burst of joy** that splashes love to its neighbors.
+The field is full of dormant universes. **Click** one to spark love into it; the
+love **spreads** to its neighbours, lighting up the network. But every lit
+universe **fades** — and spread-born love is weak, so it dies fast unless you
+keep clicking the fading ones to keep the chain alive and growing.
 
-Two race tracks sit at the top of the screen. Rack up enough **love-bursts** and
-the multiverse goes off in a **Love Explosion** (you win). Let too many
-**entropy-outbreaks** stack up and it ends in **Entropy Collapse** (you lose).
-The pressure rises over time — entropy cools faster the longer you play.
+Get enough universes lit **at once** and the love goes **viral** —
+self-sustaining. That's the win (a Love Explosion). Fall behind and the chain
+**burns out**. Decay rises the longer you play, so eventually there's more to
+click than two hands can manage… which is exactly when you want a second pair on
+the keyboard.
 
 ## Play
 
-- **Player 1 — mouse:** hover over a universe and **hold** to pour in love.
-- **Player 2 — keyboard:** **arrows / WASD** move your cursor, **Space** pours love.
-- **M** mutes the sound.
+- **Player 1 — mouse:** click universes to spark love; keep clicking the fading ones.
+- **Player 2 — keyboard:** arrows / WASD move a cursor, **Space** sparks.
+- **M** mutes.
 
-Watch a universe's color (cold = entropy, warm = love) and the pulsing rings: a
-cold pulse means it's about to outbreak; a warm pulse means it's about to burst
-with joy.
+Watch the **GOING VIRAL** bar up top — lit universes versus the takeoff target,
+with a marker at your best.
 
 ## Develop
 

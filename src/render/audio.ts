@@ -83,20 +83,15 @@ export class AudioEngine {
     o.stop(t + dur + 0.03);
   }
 
-  // A soft tick whose pitch rises with the universe's love.
-  nurture(love: number): void {
-    this.blip(640 + love * 680, 0.12, 'sine', 0.05);
+  // A bright pluck when you click to spark love into a universe.
+  spark(): void {
+    this.blip(680, 0.16, 'triangle', 0.08);
+    this.blip(1020, 0.12, 'sine', 0.05, 0.02);
   }
 
-  // A bright bell when a universe bursts into JOY.
-  loveBurst(): void {
-    [392, 494, 587, 784].forEach((f, i) => this.blip(f, 0.5, 'triangle', 0.1, i * 0.05));
-  }
-
-  // A low thud when a universe bursts into DARKNESS (an outbreak).
-  darkBurst(): void {
-    this.blip(150, 0.4, 'sawtooth', 0.12);
-    this.blip(98, 0.5, 'sine', 0.1, 0.02);
+  // A soft tick as love spreads to a new universe on its own.
+  tick(): void {
+    this.blip(520, 0.07, 'sine', 0.035);
   }
 
   // The Love Explosion — a rising major run that blooms upward.
