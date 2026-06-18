@@ -1,33 +1,24 @@
-// The Multiverse owns the graph, the RNG, the clock, and the overflow rules. It
-// runs the fixed-tick pipeline (spawn → dynamics → overflow → fade) and exposes
-// the read-only queries the renderer, the outcome classifier, and the cursors
-// need. It imports no rendering — the boundary that keeps it unit-testable.
+// The Multiverse owns the network, the RNG, and the clock. It runs the fixed
+// tick (grow the field → decay+spread → count) and exposes the read-only queries
+// the renderer, the classifier, and the cursors need. Imports no rendering.
 
-import { GraphStore, type MvNode } from './graph.ts';
+import { GraphStore } from './graph.ts';
 import { mulberry32 } from './rng.ts';
-import { SIM, FIELD, ENTROPY, SPAWN, OVERFLOW } from './constants.ts';
+import { SIM, DECAY, IGNITE, SPAWN } from './constants.ts';
 import { clamp } from '../utils/clamp.ts';
-import { stepDynamics } from './dynamics.ts';
-import { seedCluster, spawnOne } from './spawn.ts';
+import { stepSpread } from './spread.ts';
+import { seedField, spawnOne } from './spawn.ts';
 
-// How far the P2 keyboard cursor can hop in one step.
 const HOP_RADIUS = SPAWN.EDGE_MAX_DIST * 1.7;
 
 export interface Tally {
   nodeCount: number;
-  avgLove: number;
+  litCount: number;
 }
 
-export interface OverflowEvent {
+export interface SpreadEvent {
   x: number;
   y: number;
-  love: boolean; // true = a burst of joy, false = a dark outbreak
-}
-
-export interface ConstellationPoint {
-  x: number;
-  y: number;
-  love: boolean;
 }
 
 export class Multiverse {
@@ -35,10 +26,9 @@ export class Multiverse {
   rng: () => number;
   time = 0;
 
-  loveOverflows = 0; // bursts of joy — progress toward the win
-  entropyOverflows = 0; // dark outbreaks — the danger track
-  overflowEvents: OverflowEvent[] = []; // drained by the Game each frame (→ fx)
-  constellation: ConstellationPoint[] = []; // render-only memorial of culled universes
+  litCount = 0; // universes currently carrying love
+  peakLit = 0; // most ever lit at once (progress toward takeoff)
+  spreadEvents: SpreadEvent[] = []; // new infections this tick (drained by Game → sparks)
 
   private spawnAcc = 0;
   private nextId = 1;
@@ -49,7 +39,9 @@ export class Multiverse {
 
   static create(seed: number = SIM.SEED): Multiverse {
     const mv = new Multiverse(seed);
-    seedCluster(mv);
+    seedField(mv);
+    mv.igniteSeeds();
+    mv.recount();
     return mv;
   }
 
@@ -57,31 +49,36 @@ export class Multiverse {
     return this.nextId++;
   }
 
+  // Light a few universes nearest the centre to start the chain.
+  private igniteSeeds(): void {
+    const byDist = [...this.graph.values()].sort((a, b) => a.x * a.x + a.y * a.y - (b.x * b.x + b.y * b.y));
+    for (let i = 0; i < Math.min(IGNITE.SEED_SPARKS, byDist.length); i++) this.ignite(byDist[i].id);
+  }
+
   tick(dt: number): void {
     this.time += dt;
     for (const n of this.graph.values()) n.age += dt;
-
     this.maybeSpawn(dt);
-    stepDynamics(this, dt, this.entropyBias());
-    this.resolveOverflows();
-    this.updateDying(dt);
-
-    if (this.constellation.length > SIM.CONSTELLATION_MAX) {
-      this.constellation.splice(0, this.constellation.length - SIM.CONSTELLATION_MAX);
-    }
+    stepSpread(this, dt, this.decayRate());
+    this.recount();
   }
 
-  // Ambient love drain, rising over time — the pressure.
-  entropyBias(): number {
-    const mins = this.time / 60;
-    return clamp(ENTROPY.BASE + ENTROPY.RAMP_PER_MIN * mins, 0, ENTROPY.MAX);
+  private recount(): void {
+    let lit = 0;
+    for (const n of this.graph.values()) if (n.state === 'lit') lit++;
+    this.litCount = lit;
+    if (lit > this.peakLit) this.peakLit = lit;
+  }
+
+  // Signal lost per second — rises with elapsed time (the pressure).
+  decayRate(): number {
+    return clamp(DECAY.BASE + DECAY.RAMP_PER_MIN * (this.time / 60), DECAY.BASE, DECAY.MAX);
   }
 
   private maybeSpawn(dt: number): void {
-    const mins = this.time / 60;
     const rate = clamp(
-      SPAWN.RATE_BASE + SPAWN.RATE_RAMP_PER_MIN * mins,
-      SPAWN.RATE_BASE,
+      SPAWN.RATE + SPAWN.RATE_RAMP_PER_MIN * (this.time / 60),
+      SPAWN.RATE,
       SPAWN.RATE_MAX,
     );
     this.spawnAcc += rate * dt;
@@ -95,89 +92,51 @@ export class Multiverse {
     }
   }
 
-  // The heart: any universe at an extreme bursts and shoves its neighbours,
-  // which can chain into a cascade over the next ticks. Collected first, then
-  // applied, so it's deterministic and one burst per universe per tick.
-  private resolveOverflows(): void {
-    const bursting: MvNode[] = [];
-    for (const node of this.graph.values()) {
-      if (node.dying) continue;
-      if (node.love <= OVERFLOW.ENTROPY_AT || node.love >= OVERFLOW.LOVE_AT) bursting.push(node);
-    }
-    for (const node of bursting) {
-      const isLove = node.love >= OVERFLOW.LOVE_AT;
-      node.dying = true;
-      node.dieT = 0;
-      node.burstLove = isLove;
-      node.love = isLove ? 1 : 0;
-      const splash = isLove ? OVERFLOW.LOVE_SPLASH : -OVERFLOW.DARK_SPLASH;
-      for (const nid of node.neighbors) {
-        const nb = this.graph.get(nid);
-        if (!nb || nb.dying) continue;
-        nb.love = clamp(nb.love + splash, 0, 1);
-      }
-      if (isLove) this.loveOverflows++;
-      else this.entropyOverflows++;
-      this.overflowEvents.push({ x: node.x, y: node.y, love: isLove });
-    }
-  }
-
-  // Burst → fade → cull. This is what keeps the live set bounded (every
-  // overflowed universe leaves within FADE_SECONDS).
-  private updateDying(dt: number): void {
-    const toRemove: number[] = [];
-    for (const node of this.graph.values()) {
-      if (!node.dying) continue;
-      node.dieT += dt / OVERFLOW.FADE_SECONDS;
-      if (node.dieT >= 1) {
-        toRemove.push(node.id);
-        this.constellation.push({ x: node.x, y: node.y, love: node.burstLove });
-      }
-    }
-    for (const id of toRemove) this.graph.remove(id);
-  }
-
-  // ── player input ──
-
-  // Pour love into a universe this tick (a held caress). No-op if it's bursting.
-  nurture(id: number): void {
+  // ── player input: a click sparks (or refreshes) love at a universe ──
+  ignite(id: number): void {
     const n = this.graph.get(id);
-    if (!n || n.dying) return;
-    n.pour = FIELD.POUR;
+    if (!n) return;
+    n.state = 'lit';
+    n.signal = IGNITE.SIGNAL;
+    n.flash = 1;
   }
 
   // ── queries (render / outcome / cursors read these; none mutate) ──
 
   tally(): Tally {
-    let sum = 0;
-    let n = 0;
-    for (const node of this.graph.values()) {
-      if (node.dying) continue;
-      sum += node.love;
-      n++;
-    }
-    return { nodeCount: n, avgLove: n > 0 ? sum / n : 0.5 };
+    return { nodeCount: this.graph.size, litCount: this.litCount };
   }
 
+  // Camera target: the centre of the love (lit universes), or all if none lit.
   centroid(): { x: number; y: number } | null {
     let sx = 0;
     let sy = 0;
     let n = 0;
     for (const node of this.graph.values()) {
+      if (node.state !== 'lit') continue;
       sx += node.x;
       sy += node.y;
       n++;
     }
-    return n > 0 ? { x: sx / n, y: sy / n } : null;
+    if (n > 0) return { x: sx / n, y: sy / n };
+    // no love yet — fall back to the whole field
+    let ax = 0;
+    let ay = 0;
+    let m = 0;
+    for (const node of this.graph.values()) {
+      ax += node.x;
+      ay += node.y;
+      m++;
+    }
+    return m > 0 ? { x: ax / m, y: ay / m } : null;
   }
 
-  // Nearest universe to a point (within maxDist), skipping bursting ones — for
-  // the P1 pointer hit-test.
+  // Nearest universe (lit or dormant) to a point — a click ignites whatever's
+  // under it.
   nearestNode(p: { x: number; y: number }, maxDist: number): number | null {
     let best: number | null = null;
     let bestD = maxDist * maxDist;
     for (const n of this.graph.values()) {
-      if (n.dying) continue;
       const dx = n.x - p.x;
       const dy = n.y - p.y;
       const d = dx * dx + dy * dy;
@@ -196,7 +155,7 @@ export class Multiverse {
     const dnx = dir.x / dm;
     const dny = dir.y / dm;
     const cur = id !== null ? this.graph.get(id) : undefined;
-    if (!cur || cur.dying) {
+    if (!cur) {
       const c = this.centroid();
       return c ? this.nearestNode(c, HOP_RADIUS * 4) : null;
     }
@@ -204,7 +163,7 @@ export class Multiverse {
     let best: number | null = null;
     let bestScore = 0.25;
     for (const n of this.graph.values()) {
-      if (n.id === cur.id || n.dying) continue;
+      if (n.id === cur.id) continue;
       const dx = n.x - cur.x;
       const dy = n.y - cur.y;
       const dsq = dx * dx + dy * dy;

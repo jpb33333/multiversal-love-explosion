@@ -1,7 +1,7 @@
-// Player 2 — keyboard. A passive control: it tracks which movement keys are
-// held and whether the pour key (Space) is down, and hops to a neighbouring
-// universe on an interval. The Game owns the listeners and calls step() each
-// frame, then pours love into the selected universe while Space is held.
+// Player 2 — keyboard. A passive control: arrows/WASD hop the cursor between
+// universes; Space/Enter requests an ignite (a click) at the selected universe.
+// The Game owns the listeners, calls step() each frame, then consumes the
+// ignite request.
 
 import type { Multiverse } from '../sim/Multiverse.ts';
 import { LIMITS } from '../game/states.ts';
@@ -16,14 +16,14 @@ const MOVE_KEYS: Record<string, { x: number; y: number }> = {
   ArrowRight: { x: 1, y: 0 },
   KeyD: { x: 1, y: 0 },
 };
-const NURTURE_KEYS = new Set(['Space']);
+const IGNITE_KEYS = new Set(['Space', 'Enter']);
 
 export class KeyCursor {
   selectedId: number | null = null;
   private held = new Set<string>();
-  private nurtureHeld = false;
   private hopCd = 0;
-  private everPressed = false; // P2 only "exists" once they press a key
+  private everPressed = false;
+  private wantsIgnite = false;
 
   onKeyDown(code: string): boolean {
     if (code in MOVE_KEYS) {
@@ -31,8 +31,8 @@ export class KeyCursor {
       this.everPressed = true;
       return true;
     }
-    if (NURTURE_KEYS.has(code)) {
-      this.nurtureHeld = true;
+    if (IGNITE_KEYS.has(code)) {
+      this.wantsIgnite = true;
       this.everPressed = true;
       return true;
     }
@@ -41,24 +41,22 @@ export class KeyCursor {
 
   onKeyUp(code: string): void {
     if (code in MOVE_KEYS) this.held.delete(code);
-    else if (NURTURE_KEYS.has(code)) this.nurtureHeld = false;
-  }
-
-  get nurturing(): boolean {
-    return this.nurtureHeld;
   }
 
   get active(): boolean {
     return this.everPressed;
   }
 
+  // True once per Space/Enter press — the Game ignites the selected universe.
+  consumeIgnite(): boolean {
+    const w = this.wantsIgnite;
+    this.wantsIgnite = false;
+    return w;
+  }
+
   step(mv: Multiverse, dt: number): void {
     if (!this.everPressed) return;
-    // Drop a selection that has been culled or is bursting.
-    if (this.selectedId !== null) {
-      const sel = mv.graph.get(this.selectedId);
-      if (!sel || sel.dying) this.selectedId = null;
-    }
+    if (this.selectedId !== null && !mv.graph.has(this.selectedId)) this.selectedId = null;
 
     if (this.hopCd > 0) this.hopCd -= dt;
     let dx = 0;
@@ -82,9 +80,9 @@ export class KeyCursor {
 
   reset(): void {
     this.held.clear();
-    this.nurtureHeld = false;
     this.hopCd = 0;
     this.selectedId = null;
     this.everPressed = false;
+    this.wantsIgnite = false;
   }
 }

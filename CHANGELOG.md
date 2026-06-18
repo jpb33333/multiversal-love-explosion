@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-06-18
+
+### Changed
+
+- **Core rebuilt from scratch — a viral chain reaction.** You spread love like a
+  virus: CLICK a dormant universe to ignite it; love spreads to its neighbours
+  and DECAYS. Spread-born love is weak (R₀ < 1) and fizzles unless you keep
+  clicking the fading ones — so you fight to push R above 1. Get enough lit AT
+  ONCE and it goes VIRAL = win; fall behind and it burns out = lose. Decay rises
+  over time (Tetris-style escalation), so eventually you need a second pair of
+  hands (P2 on the keyboard). One verb: click.
+- Replaces the overflow model. New simulation (`spread.ts` + `Multiverse`), a
+  `GOING VIRAL` progress bar, dormant/lit node rendering, click-spark sounds.
+  README / CLAUDE / `docs/DESIGN.md` rewritten to match.
+
 ## [0.7.0] — 2026-06-18
 
 ### Changed
