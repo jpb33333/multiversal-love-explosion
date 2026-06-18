@@ -8,17 +8,19 @@ universe to ignite (or refresh) its love.
 
 - A lit universe carries a **signal** (0..1) that **decays** every tick.
 - While bright enough it **spreads** to a dormant neighbour — the chain reaction.
-- A spread-born universe starts **weak**, so on its own a chain has **R₀ < 1**
-  and fizzles. Your clicks set a universe back to full signal, extending its
-  spreading life — pushing the effective R above 1.
+- A spread-born universe starts **weak** but bright enough to ripple on a few
+  hops — a visible chain reaction — yet a chain on its own has **R₀ < 1** and
+  the wavefront always dies. Your clicks set a universe back to full signal,
+  extending its spreading life — pushing the effective R above 1.
 - **Decay rises over time**, so the network needs ever more clicking to grow.
 
 ## Win / lose
 
 - **WIN — it goes viral:** `TAKEOFF.TARGET` universes lit at once, held for
-  `TAKEOFF.DWELL`. The love is self-sustaining → Love Explosion.
+  `TAKEOFF.DWELL` — a brief spike doesn't count; you must *sustain* the
+  wavefront to prove it took off and isn't exhausted → Love Explosion.
 - **LOSE — it burns out:** the chain had caught (`peakLit ≥ OUTCOME.extinctionMinPeak`)
-  and then died to zero lit.
+  and then collapsed to near-nothing (≤ 2 lit).
 
 It plays like Tetris: you're always one step behind the rising decay, and the
 only way out is takeoff. Most runs you lose — which is the point. A second player

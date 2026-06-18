@@ -15,15 +15,19 @@ export const SIM = {
 // How love spreads from a lit universe to its dormant neighbours.
 export const SPREAD = {
   RATE: 2.6, // neighbours/s a FULL-signal universe ignites (punchy when fresh)
-  SEED_SIGNAL: 0.5, // signal a spread-born universe starts at — weak, will fizzle alone
+  SEED_SIGNAL: 0.6, // signal a spread-born universe starts at — enough to ripple a
+  // few hops (a visible chain reaction) but R₀<1, so the wavefront always dies
+  // without fresh clicks
   MIN_SIGNAL: 0.25, // below this a universe is too faint to spread
 } as const;
 
-// How fast love fades. Rises over time — the Tetris pressure.
+// How fast love fades. Ramps steeply and high — the Tetris pressure that
+// eventually outpaces any click rate, so every run that doesn't go viral
+// collapses (no stable plateau).
 export const DECAY = {
-  BASE: 0.42, // signal lost /s at t=0 (a fresh spark lives ~2.4s untended)
-  RAMP_PER_MIN: 0.16, // added per elapsed minute
-  MAX: 1.1,
+  BASE: 0.5, // signal lost /s at t=0 (a fresh spark lives ~2s untended)
+  RAMP_PER_MIN: 1.0, // added per elapsed minute — the screws tighten fast
+  MAX: 6.0,
 } as const;
 
 // A click sets a universe's signal to full.
@@ -50,8 +54,9 @@ export const SPAWN = {
 
 // Win/lose.
 export const TAKEOFF = {
-  TARGET: 48, // this many universes lit AT ONCE = it's gone viral (win)
-  DWELL: 0.7, // held this long to confirm it's real, not a blip
+  TARGET: 30, // this many universes lit AT ONCE = it's gone viral (win)
+  DWELL: 1.0, // held this long to confirm it took off and ISN'T exhausted —
+  // a brief spike to TARGET doesn't win; you must sustain the wavefront
 } as const;
 
 export const OUTCOME = {
