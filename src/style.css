@@ -1,6 +1,33 @@
-/* No @font-face: the theme font stacks fall back to Georgia / system-ui, so we
-   ship no font files and make no extra requests. Swap in self-hosted woff2 here
-   later if a specific face is wanted (mirror BW's approach). */
+/* Self-hosted fonts (mirrors Infinite Binary Wobble) so the look matches: Cardo
+   for the serif wordmark/headings, Inter for the sans UI. Latin-subset woff2
+   served same-origin — no Google Fonts request, no IP/UA leak, and the strict
+   CSP only needs font-src 'self'. font-display: swap keeps first paint snappy;
+   the canvas re-renders every frame, so Cardo/Inter swap in once they load. */
+
+@font-face {
+  font-family: 'Cardo';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/cardo-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cardo';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/cardo-400-italic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  /* Inter ships as a variable font — single woff2 covers 400..600 */
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-variable.woff2') format('woff2');
+}
 
 html,
 body {
