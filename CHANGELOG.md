@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — 2026-06-23
+
+### Added
+
+- **A new turn-based game (the new default).** A pivot from the real-time viral
+  chain reaction to a turn-based, Pandemic-style strategy game. Your havens (the
+  warm core) grant a love budget each round; you extend a *living supply line* —
+  a chain of loved couples tracing back to a haven — one ring per round across an
+  ever-expanding oval toward the **Far Shore**. End the turn and the entropy
+  onslaught draws couples from a deck and chills them; a couple struck while
+  already cold *outbreaks*, spilling cold to its neighbours and ticking the
+  collapse track toward heat death. Reach the Far Shore by an unbroken living
+  line to win; let the collapse track fill and you lose.
+- New render + game layer driving the already-tested `Cosmos` engine:
+  `src/render/turnNode.ts`, `src/render/TurnRenderer.ts`, `src/game/TurnGame.ts`.
+  Reuses the existing fit / starfield / cursors / particles / edge / button /
+  theme toolkit. A fixed world-zoom frames the whole oval (including the Far
+  Shore); pointer hit-testing happens in design space for a consistent on-screen
+  reach.
+
+### Changed
+
+- `src/main.ts` now boots `TurnGame`. The real-time viral game (`Game.ts` and its
+  render path) is parked in the tree — intact but unreferenced.
+
 ## [0.8.1] — 2026-06-18
 
 ### Changed

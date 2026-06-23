@@ -13,3 +13,15 @@ export function mulberry32(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+// In-place Fisher–Yates using a seeded rng — deterministic given the rng. Used
+// to keep the turn-based entropy deck reproducible (intensify reshuffles, deck
+// inserts), so a seed replays exactly.
+export function shuffle<T>(arr: T[], rng: () => number): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+}

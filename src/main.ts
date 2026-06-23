@@ -1,4 +1,4 @@
-import { Game } from './game/Game.ts';
+import { TurnGame } from './game/TurnGame.ts';
 
 // Clickjacking defence: the strict CSP can't set frame-ancestors via <meta>, so
 // if we're loaded inside a cross-origin frame, break out to the top window.
@@ -15,4 +15,4 @@ if (!(canvas instanceof HTMLCanvasElement)) {
   throw new Error('#stage canvas not found');
 }
 
-new Game(canvas).start();
+new TurnGame(canvas).start();
