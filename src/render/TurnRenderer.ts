@@ -179,6 +179,7 @@ export class TurnRenderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     drawStarfield(ctx, this.starfield, this.reducedMotion ? 0 : input.time, this.viewW, this.viewH);
     if (!this.reducedMotion) this.ambientLayer.ambient(this.viewW, this.viewH, input.dt);
+    this.drawVignette();
 
     const m = this.dpr * this.fit.scale;
     ctx.setTransform(m, 0, 0, m, this.dpr * this.fit.offsetX, this.dpr * this.fit.offsetY);
@@ -453,6 +454,23 @@ export class TurnRenderer {
       ctx.fillRect(x, y, bw * frac, bh);
       ctx.restore();
     }
+    ctx.restore();
+  }
+
+  // A soft warm vignette behind the scene — the gentle, focused, slightly hazy
+  // light of the film *Her*. Drawn in screen space under the game content, so it
+  // deepens the frame without dimming the nodes or HUD (which paint after).
+  private drawVignette(): void {
+    const { ctx } = this;
+    const w = this.viewW;
+    const h = this.viewH;
+    const r = Math.hypot(w, h) / 2;
+    const g = ctx.createRadialGradient(w / 2, h / 2, r * 0.42, w / 2, h / 2, r);
+    g.addColorStop(0, rgba(palette.voidDeep, 0));
+    g.addColorStop(1, rgba(palette.voidDeep, 0.6));
+    ctx.save();
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
     ctx.restore();
   }
 }
