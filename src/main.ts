@@ -1,3 +1,4 @@
+import './style.css';
 import { TurnGame } from './game/TurnGame.ts';
 
 // Clickjacking defence: the strict CSP can't set frame-ancestors via <meta>, so

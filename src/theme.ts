@@ -1,22 +1,22 @@
-// Palette for Multiversal Love Explosion. A deep cosmic void; love blooms warm
-// (rose → gold), entropy is cold and desaturated (violet-grey); the couple are
-// a rose cursor (P1) and a gold cursor (P2). A node's color is a blend along
-// the love↔entropy axis (see blendHex below), so contagion is legible as a
-// shift in hue, not just brightness. No harsh neon — same warmth-forward
-// sensibility as Infinite Binary Wobble, with a cold counterpoint for entropy.
+// Palette for Multiversal Love Explosion — tuned to the warm, soft, intimate look
+// of the film *Her*: blue is removed entirely. Love blooms as luminous coral →
+// peach-cream; entropy is its warm counterpoint — desaturated ash/taupe, never a
+// cold violet. A node's colour blends along the love↔entropy axis (see blendHex
+// below), so contagion stays legible by saturation + brightness, not a warm/cool
+// split. Same warmth-forward family as Infinite Binary Wobble.
 
 export const palette = {
-  voidDeep: '#0B0A18', // background — deep cosmic indigo-black, never pure black
-  love: '#FF8FB1', // a fully-loving node (luminous rose)
-  loveBright: '#FFD9A0', // love core / highlight / the explosion (warm gold-cream)
-  entropy: '#7D7A93', // a fully-unloving node (cold desaturated violet-grey)
-  entropyDeep: '#3A3850', // entropy shadow / dead embers
-  potential: '#A99FC0', // an undecided node (between love and entropy)
-  player1: '#F76C9C', // P1 cursor — rose
-  player2: '#F6B24B', // P2 cursor — gold
-  locked: '#DDCBF5', // a crystallized, locked-in loving cluster (pale lilac)
-  pearl: '#F3E9DE', // UI headings, wordmark
-  mist: '#C9C2D8', // secondary UI text, faint constellation
+  voidDeep: '#160A0E', // background — deep warm wine-plum near-black (no blue)
+  love: '#FF8C7A', // a fully-loving node (luminous coral)
+  loveBright: '#FFE0B0', // love core / highlight / the bloom (warm peach-cream)
+  entropy: '#8C7A70', // a fully-unloving node (warm desaturated ash/taupe)
+  entropyDeep: '#36231F', // entropy shadow / dead embers (dark warm ash)
+  potential: '#C2A091', // an undecided node (dusty warm rose-taupe)
+  player1: '#FF6F5E', // P1 cursor — living coral
+  player2: '#F4B458', // P2 cursor — warm gold
+  locked: '#F6D7BE', // a crystallized, locked-in loving cluster (pale peach-cream)
+  pearl: '#F4EAE0', // UI headings, wordmark (warm cream)
+  mist: '#C9B7AC', // secondary UI text, faint constellation (warm taupe)
 } as const;
 
 export const fonts = {
